@@ -14,6 +14,11 @@ commands:
     description: Manage global protection enchantment limits
     usage: /<command> <set|remove|check> [level]
     permission: BetterCombatLogging.admin
+  blockedregion:
+    description: Manage regions blocked during combat
+    usage: /<command> <add|remove|list|clear> [region]
+    permission: BetterCombatLogging.admin
+    aliases: [br, blockedregions]
 
 permissions:
   BetterCombatLogging.admin:

@@ -9,8 +9,10 @@ enable-pvp-combat: true
 # Broadcast when someone logs out during combat
 broadcast-combat-log: true
 
-# List of WorldGuard regions players cannot enter while in combat
-# Add region names to this list (case-sensitive)
+# NOTE: Blocked regions are now managed with the /blockedregion command!
+# Use /blockedregion add <region> to block regions
+# Use /blockedregion list to see all blocked regions
+# The blocked-regions list below is only used for initial migration
 blocked-regions:
   - "spawn"
   - "safezone"
@@ -23,3 +25,6 @@ messages:
   combat-logout: "&e{player} &clogged out during combat and died!"
   region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
   action-bar: "&c⚔ Combat: {time}s"
+  protection-limited: "&eYour item's Protection enchantment has been limited to the maximum allowed level."
+  protection-limit-set: "&eProtection enchantment has been limited to level {level} globally!"
+  protection-limit-removed: "&eProtection enchantment limit has been removed globally!"
