@@ -6,19 +6,21 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.enchantment.EnchantItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
+import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class ProtectionListener implements Listener {
 
     private final BetterCombatLogging plugin;
-    private final net.saturn.managers.ProtectionManager protectionManager;
+    private final ProtectionManager protectionManager;
 
-    public ProtectionListener(BetterCombatLogging plugin, net.saturn.managers.ProtectionManager protectionManager) {
+    public ProtectionListener(BetterCombatLogging plugin, ProtectionManager protectionManager) {
         this.plugin = plugin;
         this.protectionManager = protectionManager;
     }
@@ -30,24 +32,65 @@ public class ProtectionListener implements Listener {
         }
 
         Player player = (Player) event.getWhoClicked();
-
-        // Don't enforce in enchanting tables or anvils
-        if (event.getInventory().getType() == InventoryType.ENCHANTING ||
-                event.getInventory().getType() == InventoryType.ANVIL) {
-            return;
-        }
-
         ItemStack item = event.getCurrentItem();
+
         if (item == null) {
             return;
         }
 
-        // Check and enforce limit after a small delay to ensure the item is in inventory
+        // Special handling for anvil result slot
+        if (event.getInventory() instanceof AnvilInventory && event.getRawSlot() == 2) {
+            // Check the result item after a delay to ensure it's finalized
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (player.isOnline()) {
+                        ItemStack result = event.getInventory().getItem(2);
+                        if (result != null && protectionManager.enforceLimit(result)) {
+                            player.sendMessage(colorize(plugin.getConfig().getString(
+                                    "messages.protection-limited",
+                                    "&eYour item's Protection enchantment has been limited to the maximum allowed level."
+                            )));
+                        }
+                    }
+                }
+            }.runTaskLater(plugin, 1L);
+            return;
+        }
+
+        // Don't enforce in enchanting tables - handled by EnchantItemEvent
+        if (event.getInventory().getType() == InventoryType.ENCHANTING) {
+            return;
+        }
+
+        // Check and enforce limit after a small delay for other inventory actions
         new BukkitRunnable() {
             @Override
             public void run() {
                 if (player.isOnline()) {
                     checkPlayerInventory(player);
+                }
+            }
+        }.runTaskLater(plugin, 1L);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEnchantItem(EnchantItemEvent event) {
+        Player player = event.getEnchanter();
+        ItemStack item = event.getItem();
+
+        // Check if the enchantment will result in protection that exceeds the limit
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (player.isOnline() && item != null) {
+                    boolean modified = protectionManager.enforceLimit(item);
+                    if (modified) {
+                        player.sendMessage(colorize(plugin.getConfig().getString(
+                                "messages.protection-limited",
+                                "&eYour item's Protection enchantment has been limited to the maximum allowed level."
+                        )));
+                    }
                 }
             }
         }.runTaskLater(plugin, 1L);
