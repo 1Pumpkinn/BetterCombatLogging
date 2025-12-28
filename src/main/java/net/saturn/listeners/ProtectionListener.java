@@ -1,7 +1,7 @@
-package net.saturn.betterCombatLogger.listeners;
+package net.saturn.listeners;
 
-import net.saturn.betterCombatLogger.BetterCombatLogger;
-import net.saturn.betterCombatLogger.managers.ProtectionManager;
+import net.saturn.BetterCombatLogging;
+import net.saturn.managers.ProtectionManager;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,10 +15,10 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class ProtectionListener implements Listener {
 
-    private final BetterCombatLogger plugin;
-    private final ProtectionManager protectionManager;
+    private final BetterCombatLogging plugin;
+    private final net.saturn.managers.ProtectionManager protectionManager;
 
-    public ProtectionListener(BetterCombatLogger plugin, ProtectionManager protectionManager) {
+    public ProtectionListener(BetterCombatLogging plugin, net.saturn.managers.ProtectionManager protectionManager) {
         this.plugin = plugin;
         this.protectionManager = protectionManager;
     }

@@ -1,4 +1,4 @@
-package net.saturn.betterCombatLogger.managers;
+package net.saturn.managers;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -11,12 +11,12 @@ import java.util.UUID;
 
 public class CombatManager {
 
-    private final net.saturn.betterCombatLogger.BetterCombatLogger plugin;
+    private final net.saturn.BetterCombatLogging plugin;
     private final Map<UUID, Long> combatTags;
     private final Map<UUID, BukkitTask> actionBarTasks;
     private final int combatDuration;
 
-    public CombatManager(net.saturn.betterCombatLogger.BetterCombatLogger plugin) {
+    public CombatManager(net.saturn.BetterCombatLogging plugin) {
         this.plugin = plugin;
         this.combatTags = new HashMap<>();
         this.actionBarTasks = new HashMap<>();

@@ -1,6 +1,6 @@
-package net.saturn.betterCombatLogger.managers;
+package net.saturn.managers;
 
-import net.saturn.betterCombatLogger.BetterCombatLogger;
+import net.saturn.BetterCombatLogging;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -14,12 +14,12 @@ import java.util.Map;
 
 public class ProtectionManager {
 
-    private final BetterCombatLogger plugin;
+    private final BetterCombatLogging plugin;
     private final Map<String, Integer> worldLimits;
     private File dataFile;
     private FileConfiguration data;
 
-    public ProtectionManager(BetterCombatLogger plugin) {
+    public ProtectionManager(BetterCombatLogging plugin) {
         this.plugin = plugin;
         this.worldLimits = new HashMap<>();
         this.dataFile = new File(plugin.getDataFolder(), "protection-limits.yml");

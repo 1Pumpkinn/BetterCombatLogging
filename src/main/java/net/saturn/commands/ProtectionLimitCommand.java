@@ -1,7 +1,7 @@
-package net.saturn.betterCombatLogger.commands;
+package net.saturn.commands;
 
-import net.saturn.betterCombatLogger.BetterCombatLogger;
-import net.saturn.betterCombatLogger.managers.ProtectionManager;
+import net.saturn.BetterCombatLogging;
+import net.saturn.managers.ProtectionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,17 +16,17 @@ import java.util.stream.Collectors;
 
 public class ProtectionLimitCommand implements CommandExecutor, TabCompleter {
 
-    private final BetterCombatLogger plugin;
+    private final BetterCombatLogging plugin;
     private final ProtectionManager protectionManager;
 
-    public ProtectionLimitCommand(BetterCombatLogger plugin, ProtectionManager protectionManager) {
+    public ProtectionLimitCommand(BetterCombatLogging plugin, ProtectionManager protectionManager) {
         this.plugin = plugin;
         this.protectionManager = protectionManager;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("bettercombatlogger.admin")) {
+        if (!sender.hasPermission("BetterCombatLogging.admin")) {
             sender.sendMessage(colorize("&cYou don't have permission to use this command!"));
             return true;
         }

@@ -1,6 +1,6 @@
-package net.saturn.betterCombatLogger.commands;
+package net.saturn.commands;
 
-import net.saturn.betterCombatLogger.managers.CombatManager;
+import net.saturn.managers.CombatManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;

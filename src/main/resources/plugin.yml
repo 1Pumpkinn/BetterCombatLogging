@@ -1,6 +1,6 @@
 name: BetterCombatLogging
 version: '1.0-SNAPSHOT'
-main: net.saturn.betterCombatLogging.BetterCombatLogging
+main: net.saturn.BetterCombatLogging
 api-version: '1.21'
 load: STARTUP
 authors: [ ___Pumpkinn ]

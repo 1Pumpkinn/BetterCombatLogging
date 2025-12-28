@@ -1,7 +1,7 @@
-package net.saturn.betterCombatLogger.listeners;
+package net.saturn.listeners;
 
-import net.saturn.betterCombatLogger.BetterCombatLogger;
-import net.saturn.betterCombatLogger.managers.CombatManager;
+import net.saturn.BetterCombatLogging;
+import net.saturn.managers.CombatManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -14,10 +14,10 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 public class CombatListener implements Listener {
 
-    private final BetterCombatLogger plugin;
+    private final BetterCombatLogging plugin;
     private final CombatManager combatManager;
 
-    public CombatListener(BetterCombatLogger plugin, CombatManager combatManager) {
+    public CombatListener(BetterCombatLogging plugin, CombatManager combatManager) {
         this.plugin = plugin;
         this.combatManager = combatManager;
     }
