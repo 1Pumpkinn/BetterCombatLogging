@@ -1,5 +1,6 @@
 package net.saturn;
 
+import net.saturn.commands.BlockedRegionCommand;
 import net.saturn.commands.CombatCommand;
 import net.saturn.commands.ProtectionLimitCommand;
 import net.saturn.listeners.CombatListener;
@@ -7,12 +8,14 @@ import net.saturn.listeners.ProtectionListener;
 import net.saturn.listeners.RegionListener;
 import net.saturn.managers.CombatManager;
 import net.saturn.managers.ProtectionManager;
+import net.saturn.managers.RegionManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class BetterCombatLogging extends JavaPlugin {
 
     private CombatManager combatManager;
     private ProtectionManager protectionManager;
+    private RegionManager regionManager;
     private boolean worldGuardEnabled = false;
 
     @Override
@@ -33,6 +36,9 @@ public final class BetterCombatLogging extends JavaPlugin {
         protectionManager = new ProtectionManager(this);
         protectionManager.load();
 
+        regionManager = new RegionManager(this);
+        regionManager.load();
+
         // Register listeners
         getServer().getPluginManager().registerEvents(new CombatListener(this, combatManager), this);
         getServer().getPluginManager().registerEvents(new ProtectionListener(this, protectionManager), this);
@@ -45,6 +51,7 @@ public final class BetterCombatLogging extends JavaPlugin {
         // Register commands
         getCommand("combat").setExecutor(new CombatCommand(combatManager));
         getCommand("protectionlimit").setExecutor(new ProtectionLimitCommand(this, protectionManager));
+        getCommand("blockedregion").setExecutor(new BlockedRegionCommand(this, regionManager));
 
         getLogger().info("BetterCombatLogging has been enabled!");
     }
@@ -61,6 +68,11 @@ public final class BetterCombatLogging extends JavaPlugin {
             protectionManager.save();
         }
 
+        // Save blocked regions
+        if (regionManager != null) {
+            regionManager.save();
+        }
+
         getLogger().info("BetterCombatLogging has been disabled!");
     }
 
@@ -70,6 +82,10 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     public ProtectionManager getProtectionManager() {
         return protectionManager;
+    }
+
+    public RegionManager getRegionManager() {
+        return regionManager;
     }
 
     public boolean isWorldGuardEnabled() {

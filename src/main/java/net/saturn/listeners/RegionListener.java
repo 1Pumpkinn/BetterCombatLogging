@@ -46,8 +46,8 @@ public class RegionListener implements Listener {
             return;
         }
 
-        // Get blocked regions from config
-        List<String> blockedRegions = plugin.getConfig().getStringList("blocked-regions");
+        // Get blocked regions from RegionManager
+        List<String> blockedRegions = plugin.getRegionManager().getBlockedRegions();
         if (blockedRegions.isEmpty()) {
             return;
         }
