@@ -1,0 +1,25 @@
+# BetterCombatLogger Configuration
+
+# Combat duration in seconds
+combat-duration: 15
+
+# Enable PvP combat tagging
+enable-pvp-combat: true
+
+# Broadcast when someone logs out during combat
+broadcast-combat-log: true
+
+# List of WorldGuard regions players cannot enter while in combat
+# Add region names to this list (case-sensitive)
+blocked-regions:
+  - "spawn"
+  - "safezone"
+  - "shop"
+
+# Messages (Use & for color codes)
+messages:
+  combat-enter: "&c⚔ You are now in combat!"
+  combat-exit: "&a✔ You are no longer in combat!"
+  combat-logout: "&e{player} &clogged out during combat and died!"
+  region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
+  action-bar: "&c⚔ Combat: {time}s"

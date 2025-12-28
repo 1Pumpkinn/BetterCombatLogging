@@ -9,46 +9,49 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class ProtectionManager {
 
     private final BetterCombatLogging plugin;
-    private final Map<String, Integer> worldLimits;
+    private Integer globalLimit; // null means no limit
     private File dataFile;
     private FileConfiguration data;
 
     public ProtectionManager(BetterCombatLogging plugin) {
         this.plugin = plugin;
-        this.worldLimits = new HashMap<>();
+        this.globalLimit = null;
         this.dataFile = new File(plugin.getDataFolder(), "protection-limits.yml");
     }
 
     public void load() {
         if (!dataFile.exists()) {
-            plugin.saveResource("protection-limits.yml", false);
-        }
-        data = YamlConfiguration.loadConfiguration(dataFile);
-
-        // Load world limits
-        if (data.contains("world-limits")) {
-            for (String world : data.getConfigurationSection("world-limits").getKeys(false)) {
-                worldLimits.put(world, data.getInt("world-limits." + world));
+            try {
+                dataFile.getParentFile().mkdirs();
+                dataFile.createNewFile();
+            } catch (IOException e) {
+                plugin.getLogger().severe("Could not create protection-limits.yml: " + e.getMessage());
             }
         }
 
-        plugin.getLogger().info("Loaded " + worldLimits.size() + " world protection limits");
+        data = YamlConfiguration.loadConfiguration(dataFile);
+
+        // Load global limit
+        if (data.contains("global-limit")) {
+            globalLimit = data.getInt("global-limit");
+            plugin.getLogger().info("Loaded global protection limit: " + globalLimit);
+        } else {
+            plugin.getLogger().info("No global protection limit set");
+        }
     }
 
     public void save() {
         try {
             // Clear existing data
-            data.set("world-limits", null);
+            data.set("global-limit", null);
 
-            // Save all world limits
-            for (Map.Entry<String, Integer> entry : worldLimits.entrySet()) {
-                data.set("world-limits." + entry.getKey(), entry.getValue());
+            // Save global limit if set
+            if (globalLimit != null && globalLimit > 0) {
+                data.set("global-limit", globalLimit);
             }
 
             data.save(dataFile);
@@ -58,41 +61,35 @@ public class ProtectionManager {
         }
     }
 
-    public void setLimit(String worldName, int level) {
+    public void setLimit(int level) {
         if (level <= 0) {
-            worldLimits.remove(worldName);
+            globalLimit = null;
         } else {
-            worldLimits.put(worldName, level);
+            globalLimit = level;
         }
         save();
     }
 
-    public Integer getLimit(String worldName) {
-        return worldLimits.get(worldName);
+    public Integer getLimit() {
+        return globalLimit;
     }
 
-    public boolean hasLimit(String worldName) {
-        return worldLimits.containsKey(worldName);
-    }
-
-    public Map<String, Integer> getAllLimits() {
-        return new HashMap<>(worldLimits);
+    public boolean hasLimit() {
+        return globalLimit != null && globalLimit > 0;
     }
 
     /**
      * Enforces protection enchantment limits on an item
      * @param item The item to check and modify
-     * @param worldName The world the player is in
      * @return true if the item was modified, false otherwise
      */
-    public boolean enforceLimit(ItemStack item, String worldName) {
+    public boolean enforceLimit(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return false;
         }
 
-        Integer limit = getLimit(worldName);
-        if (limit == null) {
-            return false; // No limit set for this world
+        if (!hasLimit()) {
+            return false; // No limit set
         }
 
         ItemMeta meta = item.getItemMeta();
@@ -101,13 +98,13 @@ public class ProtectionManager {
         }
 
         int currentLevel = meta.getEnchantLevel(Enchantment.PROTECTION);
-        if (currentLevel <= limit) {
+        if (currentLevel <= globalLimit) {
             return false; // Already within limit
         }
 
         // Remove and re-add with limited level
         meta.removeEnchant(Enchantment.PROTECTION);
-        meta.addEnchant(Enchantment.PROTECTION, limit, true);
+        meta.addEnchant(Enchantment.PROTECTION, globalLimit, true);
         item.setItemMeta(meta);
 
         return true; // Item was modified
@@ -116,16 +113,14 @@ public class ProtectionManager {
     /**
      * Checks if an item exceeds the protection limit
      * @param item The item to check
-     * @param worldName The world the player is in
      * @return true if item exceeds limit, false otherwise
      */
-    public boolean exceedsLimit(ItemStack item, String worldName) {
+    public boolean exceedsLimit(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return false;
         }
 
-        Integer limit = getLimit(worldName);
-        if (limit == null) {
+        if (!hasLimit()) {
             return false;
         }
 
@@ -134,6 +129,6 @@ public class ProtectionManager {
             return false;
         }
 
-        return meta.getEnchantLevel(Enchantment.PROTECTION) > limit;
+        return meta.getEnchantLevel(Enchantment.PROTECTION) > globalLimit;
     }
 }

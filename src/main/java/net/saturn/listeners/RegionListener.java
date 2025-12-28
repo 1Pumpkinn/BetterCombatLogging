@@ -7,8 +7,6 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.regions.RegionContainer;
 import com.sk89q.worldguard.protection.regions.RegionQuery;
 import net.saturn.BetterCombatLogging;
-import net.saturn.BetterCombatLogging.BetterCombatLogging;
-import net.saturn.BetterCombatLogging.managers.CombatManager;
 import net.saturn.managers.CombatManager;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -22,9 +20,9 @@ import java.util.List;
 public class RegionListener implements Listener {
 
     private final BetterCombatLogging plugin;
-    private final net.saturn.managers.CombatManager combatManager;
+    private final CombatManager combatManager;
 
-    public RegionListener(BetterCombatLogging plugin, net.saturn.managers.CombatManager combatManager) {
+    public RegionListener(BetterCombatLogging plugin, CombatManager combatManager) {
         this.plugin = plugin;
         this.combatManager = combatManager;
     }

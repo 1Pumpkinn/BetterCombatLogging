@@ -4,3 +4,18 @@ main: net.saturn.BetterCombatLogging
 api-version: '1.21'
 load: STARTUP
 authors: [ ___Pumpkinn ]
+softdepend: [ WorldGuard ]
+
+commands:
+  combat:
+    description: Check your combat status
+    usage: /<command>
+  protectionlimit:
+    description: Manage global protection enchantment limits
+    usage: /<command> <set|remove|check> [level]
+    permission: BetterCombatLogging.admin
+
+permissions:
+  BetterCombatLogging.admin:
+    description: Allows use of admin commands
+    default: op

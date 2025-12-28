@@ -13,14 +13,16 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     private CombatManager combatManager;
     private ProtectionManager protectionManager;
+    private boolean worldGuardEnabled = false;
 
     @Override
     public void onEnable() {
-        // Check for WorldGuard
-        if (getServer().getPluginManager().getPlugin("WorldGuard") == null) {
-            getLogger().severe("WorldGuard not found! Disabling plugin...");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
+        // Check for WorldGuard (optional for region-based features)
+        if (getServer().getPluginManager().getPlugin("WorldGuard") != null) {
+            worldGuardEnabled = true;
+            getLogger().info("WorldGuard detected! Region-based combat restrictions enabled.");
+        } else {
+            getLogger().warning("WorldGuard not found! Region-based combat restrictions disabled.");
         }
 
         // Save default config
@@ -33,8 +35,12 @@ public final class BetterCombatLogging extends JavaPlugin {
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new CombatListener(this, combatManager), this);
-        getServer().getPluginManager().registerEvents(new RegionListener(this, combatManager), this);
         getServer().getPluginManager().registerEvents(new ProtectionListener(this, protectionManager), this);
+
+        // Only register RegionListener if WorldGuard is present
+        if (worldGuardEnabled) {
+            getServer().getPluginManager().registerEvents(new RegionListener(this, combatManager), this);
+        }
 
         // Register commands
         getCommand("combat").setExecutor(new CombatCommand(combatManager));
@@ -64,5 +70,9 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     public ProtectionManager getProtectionManager() {
         return protectionManager;
+    }
+
+    public boolean isWorldGuardEnabled() {
+        return worldGuardEnabled;
     }
 }
