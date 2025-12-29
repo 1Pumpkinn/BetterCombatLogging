@@ -24,7 +24,7 @@ messages:
   combat-exit: "&a✔ You are no longer in combat!"
   combat-logout: "&e{player} &clogged out during combat and died!"
   region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
-  action-bar: "&c⚔ Combat: {time}s"
+  boss-bar: "&c⚔ Combat: {time}s"
   protection-limited: "&eYour item's Protection enchantment has been limited to the maximum allowed level."
   protection-limit-set: "&eProtection enchantment has been limited to level {level} globally!"
   protection-limit-removed: "&eProtection enchantment limit has been removed globally!"

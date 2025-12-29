@@ -1,6 +1,9 @@
 package net.saturn.managers;
 
 import org.bukkit.Bukkit;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -13,13 +16,15 @@ public class CombatManager {
 
     private final net.saturn.BetterCombatLogging plugin;
     private final Map<UUID, Long> combatTags;
-    private final Map<UUID, BukkitTask> actionBarTasks;
+    private final Map<UUID, BossBar> bossBars;
+    private final Map<UUID, BukkitTask> bossBarTasks;
     private final int combatDuration;
 
     public CombatManager(net.saturn.BetterCombatLogging plugin) {
         this.plugin = plugin;
         this.combatTags = new HashMap<>();
-        this.actionBarTasks = new HashMap<>();
+        this.bossBars = new HashMap<>();
+        this.bossBarTasks = new HashMap<>();
         this.combatDuration = plugin.getConfig().getInt("combat-duration", 15);
     }
 
@@ -33,7 +38,7 @@ public class CombatManager {
         if (!wasInCombat) {
             String enterMessage = plugin.getConfig().getString("messages.combat-enter", "&cYou are now in combat!");
             player.sendMessage(colorize(enterMessage));
-            startActionBarTimer(player);
+            startBossBarTimer(player);
         }
     }
 
@@ -68,21 +73,34 @@ public class CombatManager {
         if (combatTags.remove(uuid) != null) {
             String exitMessage = plugin.getConfig().getString("messages.combat-exit", "&aYou are no longer in combat!");
             player.sendMessage(colorize(exitMessage));
-            stopActionBarTimer(player);
+            stopBossBarTimer(player);
         }
     }
 
-    private void startActionBarTimer(Player player) {
+    private void startBossBarTimer(Player player) {
         UUID uuid = player.getUniqueId();
 
-        // Cancel existing task if any
-        stopActionBarTimer(player);
+        // Cancel existing task and boss bar if any
+        stopBossBarTimer(player);
 
+        // Create boss bar
+        String bossBarTitle = plugin.getConfig().getString("messages.boss-bar", "&c⚔ Combat: {time}s");
+        BossBar bossBar = Bukkit.createBossBar(
+                colorize(bossBarTitle.replace("{time}", String.valueOf(combatDuration))),
+                BarColor.RED,
+                BarStyle.SOLID
+        );
+        bossBar.addPlayer(player);
+        bossBar.setVisible(true);
+        bossBars.put(uuid, bossBar);
+
+        // Start update task
         BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
                 if (!player.isOnline()) {
                     cancel();
+                    stopBossBarTimer(player);
                     return;
                 }
 
@@ -93,29 +111,60 @@ public class CombatManager {
                     return;
                 }
 
-                String actionBar = plugin.getConfig().getString("messages.action-bar", "&c⚔ Combat: {time}s")
+                // Update boss bar title
+                String title = plugin.getConfig().getString("messages.boss-bar", "&c⚔ Combat: {time}s")
                         .replace("{time}", String.valueOf(remaining));
-                player.sendActionBar(colorize(actionBar));
-            }
-        }.runTaskTimer(plugin, 0L, 20L);
+                bossBar.setTitle(colorize(title));
 
-        actionBarTasks.put(uuid, task);
+                // Update boss bar progress (percentage of time remaining)
+                double progress = (double) remaining / combatDuration;
+                bossBar.setProgress(Math.max(0.0, Math.min(1.0, progress)));
+
+                // Change color based on remaining time
+                if (remaining <= 5) {
+                    bossBar.setColor(BarColor.YELLOW);
+                } else if (remaining <= 10) {
+                    bossBar.setColor(BarColor.RED);
+                } else {
+                    bossBar.setColor(BarColor.RED);
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 20L); // Run every second
+
+        bossBarTasks.put(uuid, task);
     }
 
-    private void stopActionBarTimer(Player player) {
+    private void stopBossBarTimer(Player player) {
         UUID uuid = player.getUniqueId();
-        BukkitTask task = actionBarTasks.remove(uuid);
+
+        // Cancel task
+        BukkitTask task = bossBarTasks.remove(uuid);
         if (task != null) {
             task.cancel();
+        }
+
+        // Remove boss bar
+        BossBar bossBar = bossBars.remove(uuid);
+        if (bossBar != null) {
+            bossBar.removePlayer(player);
+            bossBar.setVisible(false);
         }
     }
 
     public void shutdown() {
-        // Cancel all action bar tasks
-        for (BukkitTask task : actionBarTasks.values()) {
+        // Cancel all boss bar tasks
+        for (BukkitTask task : bossBarTasks.values()) {
             task.cancel();
         }
-        actionBarTasks.clear();
+        bossBarTasks.clear();
+
+        // Remove all boss bars
+        for (BossBar bossBar : bossBars.values()) {
+            bossBar.removeAll();
+            bossBar.setVisible(false);
+        }
+        bossBars.clear();
+
         combatTags.clear();
     }
 
