@@ -1,4 +1,4 @@
-package net.saturn.commands;
+package net.saturn.commands.combat;
 
 import net.saturn.managers.CombatManager;
 import org.bukkit.command.Command;

@@ -10,15 +10,29 @@ commands:
   combat:
     description: Check your combat status
     usage: /<command>
+
   protectionlimit:
     description: Manage global protection enchantment limits
     usage: /<command> <set|remove|check> [level]
     permission: BetterCombatLogging.admin
+
   blockedregion:
     description: Manage regions blocked during combat
     usage: /<command> <add|remove|list|clear> [region]
     permission: BetterCombatLogging.admin
     aliases: [br, blockedregions]
+
+  activatecombat:
+    description: Manually activate combat mode for a player (testing)
+    usage: /<command> <player>
+    permission: BetterCombatLogging.admin
+    aliases: [combattest, testcombat]
+
+  setcombatduration:
+    description: Set the combat duration in seconds
+    usage: /<command> <seconds>
+    permission: BetterCombatLogging.admin
+    aliases: [combatduration, setcombat]
 
 permissions:
   BetterCombatLogging.admin:
