@@ -62,6 +62,8 @@ public final class BetterCombatLogging extends JavaPlugin {
         if (worldGuardEnabled) {
             getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionListener(this, combatManager), this);
             getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionVisualizerListener(this), this);
+            getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionVehicleListener(this), this);
+            getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionBlockBreakListener(this), this);
         }
 
         // Start item clear task if enabled

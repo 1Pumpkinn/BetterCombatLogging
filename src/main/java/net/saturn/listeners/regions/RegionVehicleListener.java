@@ -37,8 +37,8 @@ public class RegionVehicleListener implements Listener {
             return;
         }
 
-        Location from = event.getFrom();
         Location to = event.getTo();
+        Location from = event.getFrom();
 
         // Only check if vehicle moved to a different block
         if (from.getBlockX() == to.getBlockX() &&

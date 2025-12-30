@@ -108,6 +108,12 @@ public class RegionBorderVisualizer {
         }
     }
 
+    public boolean isVisualizerBlock(Player player, Location location) {
+        UUID uuid = player.getUniqueId();
+        Set<Location> blocks = playerVisibleBlocks.get(uuid);
+        return blocks != null && blocks.contains(location);
+    }
+
     private boolean isPlayerNearRegion(Location playerLoc, ProtectedRegion region, int distance) {
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
