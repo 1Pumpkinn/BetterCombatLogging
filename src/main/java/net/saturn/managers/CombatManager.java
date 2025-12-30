@@ -30,9 +30,12 @@ public class CombatManager {
 
     public void tagPlayer(Player player) {
         UUID uuid = player.getUniqueId();
-        long expireTime = System.currentTimeMillis() + (combatDuration * 1000L);
+        long currentTime = System.currentTimeMillis();
+        long expireTime = currentTime + (combatDuration * 1000L);
 
         boolean wasInCombat = isInCombat(player);
+
+        // Always update the expire time to reset the timer
         combatTags.put(uuid, expireTime);
 
         if (!wasInCombat) {
@@ -40,6 +43,7 @@ public class CombatManager {
             player.sendMessage(colorize(enterMessage));
             startBossBarTimer(player);
         }
+        // If already in combat, the timer will be updated in the next tick of the BossBar task
     }
 
     public boolean isInCombat(Player player) {

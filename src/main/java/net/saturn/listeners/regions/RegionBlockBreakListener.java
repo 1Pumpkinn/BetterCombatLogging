@@ -8,6 +8,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 
+
 public class RegionBlockBreakListener implements Listener {
 
     private final BetterCombatLogging plugin;
