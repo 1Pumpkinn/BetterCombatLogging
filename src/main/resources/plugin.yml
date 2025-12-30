@@ -35,8 +35,15 @@ commands:
     aliases: [combatduration, setcombat]
 
   cleanup:
-    permission: op
+    description: Manage map cleanup (cobwebs, water, lava)
+    usage: /<command> [now|toggle|interval|status]
+    permission: BetterCombatLogging.admin
 
+  itemclear:
+    description: Clear dropped items and manage settings
+    usage: /<command> [now|toggle|interval|status]
+    permission: BetterCombatLogging.admin
+    aliases: [ic, clearitems]
 
 permissions:
   BetterCombatLogging.admin:

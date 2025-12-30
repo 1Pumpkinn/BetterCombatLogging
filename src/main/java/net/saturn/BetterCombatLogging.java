@@ -1,17 +1,19 @@
 package net.saturn;
 
 import net.saturn.commands.BlockedRegionCommand;
-import net.saturn.commands.CleanupCommand;
+import net.saturn.commands.cleanup.CleanupCommand;
+import net.saturn.commands.cleanup.ItemClearCommand;
 import net.saturn.commands.combat.CombatCommand;
 import net.saturn.commands.combat.CombatDurationCommand;
 import net.saturn.commands.combat.CombatTestCommand;
-import net.saturn.commands.ProtectionLimitCommand;
+import net.saturn.commands.limitations.ProtectionLimitCommand;
 import net.saturn.listeners.CombatListener;
 import net.saturn.listeners.ProtectionListener;
 import net.saturn.listeners.RegionListener;
 import net.saturn.managers.CombatManager;
 import net.saturn.managers.ProtectionManager;
 import net.saturn.managers.RegionManager;
+import net.saturn.tasks.cleanup.ItemClearTask;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class BetterCombatLogging extends JavaPlugin {
@@ -19,6 +21,7 @@ public final class BetterCombatLogging extends JavaPlugin {
     private CombatManager combatManager;
     private ProtectionManager protectionManager;
     private RegionManager regionManager;
+    private ItemClearTask itemClearTask;
     private boolean worldGuardEnabled = false;
 
     @Override
@@ -51,6 +54,13 @@ public final class BetterCombatLogging extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new RegionListener(this, combatManager), this);
         }
 
+        // Start item clear task if enabled
+        if (getConfig().getBoolean("item-clear.enabled", true)) {
+            itemClearTask = new ItemClearTask(this);
+            itemClearTask.runTaskTimer(this, 0L, 20L); // Run every second
+            getLogger().info("Item clear task started!");
+        }
+
         // Register commands
         getCommand("combat").setExecutor(new CombatCommand(combatManager));
         getCommand("protectionlimit").setExecutor(new ProtectionLimitCommand(this, protectionManager));
@@ -58,6 +68,7 @@ public final class BetterCombatLogging extends JavaPlugin {
         getCommand("activatecombat").setExecutor(new CombatTestCommand(combatManager));
         getCommand("setcombatduration").setExecutor(new CombatDurationCommand(this));
         getCommand("cleanup").setExecutor(new CleanupCommand(this));
+        getCommand("itemclear").setExecutor(new ItemClearCommand(this));
 
         getLogger().info("BetterCombatLogging has been enabled!");
     }
@@ -77,6 +88,11 @@ public final class BetterCombatLogging extends JavaPlugin {
         // Save blocked regions
         if (regionManager != null) {
             regionManager.save();
+        }
+
+        // Cancel item clear task
+        if (itemClearTask != null) {
+            itemClearTask.cancel();
         }
 
         getLogger().info("BetterCombatLogging has been disabled!");

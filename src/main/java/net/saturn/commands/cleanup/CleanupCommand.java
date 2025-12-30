@@ -1,7 +1,7 @@
-package net.saturn.commands;
+package net.saturn.commands.cleanup;
 
 import net.saturn.BetterCombatLogging;
-import net.saturn.tasks.MapCleanupTask;
+import net.saturn.tasks.cleanup.MapCleanupTask;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;

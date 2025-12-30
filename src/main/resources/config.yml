@@ -2,6 +2,7 @@
 
 # Combat duration in seconds
 combat-duration: 15
+clear-interval-minutes: 20
 
 # Enable PvP combat tagging
 enable-pvp-combat: true
@@ -9,14 +10,15 @@ enable-pvp-combat: true
 # Broadcast when someone logs out during combat
 broadcast-combat-log: true
 
+warning-seconds: 30
+announce-warning: true
+announce-clear: true
+
+
 # NOTE: Blocked regions are now managed with the /blockedregion command!
 # Use /blockedregion add <region> to block regions
 # Use /blockedregion list to see all blocked regions
 # The blocked-regions list below is only used for initial migration
-blocked-regions:
-  - "spawn"
-  - "safezone"
-  - "shop"
 
 # Messages (Use & for color codes)
 messages:
@@ -25,6 +27,8 @@ messages:
   combat-logout: "&e{player} &clogged out during combat and died!"
   region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
   boss-bar: "&c⚔ Combat: {time}s"
+  warning: "&eItems will be cleared in {time} seconds!"
+  cleared: "&aAll items have been cleared from the ground!"
   protection-limited: "&eYour item's Protection enchantment has been limited to the maximum allowed level."
   protection-limit-set: "&eProtection enchantment has been limited to level {level} globally!"
   protection-limit-removed: "&eProtection enchantment limit has been removed globally!"

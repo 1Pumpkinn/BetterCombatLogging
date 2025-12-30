@@ -1,4 +1,4 @@
-package net.saturn.tasks;
+package net.saturn.tasks.cleanup;
 
 import net.saturn.BetterCombatLogging;
 import org.bukkit.Bukkit;
