@@ -1,4 +1,4 @@
-package net.saturn.managers;
+package net.saturn.managers.regions;
 
 import net.saturn.BetterCombatLogging;
 import org.bukkit.configuration.file.FileConfiguration;

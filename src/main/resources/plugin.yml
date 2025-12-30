@@ -45,6 +45,12 @@ commands:
     permission: BetterCombatLogging.admin
     aliases: [ic, clearitems]
 
+  togglevisualizer:
+    description: Toggle region border visualizer on/off
+    usage: /<command>
+    permission: BetterCombatLogging.admin
+    aliases: [togglevis, regionvis]
+
 permissions:
   BetterCombatLogging.admin:
     description: Allows use of admin commands

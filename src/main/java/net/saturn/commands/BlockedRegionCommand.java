@@ -1,7 +1,7 @@
 package net.saturn.commands;
 
 import net.saturn.BetterCombatLogging;
-import net.saturn.managers.RegionManager;
+import net.saturn.managers.regions.RegionManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;

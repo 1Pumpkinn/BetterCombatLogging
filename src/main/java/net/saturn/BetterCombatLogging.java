@@ -9,10 +9,11 @@ import net.saturn.commands.combat.CombatTestCommand;
 import net.saturn.commands.limitations.ProtectionLimitCommand;
 import net.saturn.listeners.CombatListener;
 import net.saturn.listeners.ProtectionListener;
-import net.saturn.listeners.RegionListener;
+import net.saturn.listeners.regions.RegionListener;
 import net.saturn.managers.CombatManager;
 import net.saturn.managers.ProtectionManager;
-import net.saturn.managers.RegionManager;
+import net.saturn.managers.regions.RegionBorderVisualizer;
+import net.saturn.managers.regions.RegionManager;
 import net.saturn.tasks.cleanup.ItemClearTask;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,6 +22,7 @@ public final class BetterCombatLogging extends JavaPlugin {
     private CombatManager combatManager;
     private ProtectionManager protectionManager;
     private RegionManager regionManager;
+    private RegionBorderVisualizer regionVisualizer;
     private ItemClearTask itemClearTask;
     private boolean worldGuardEnabled = false;
 
@@ -45,13 +47,21 @@ public final class BetterCombatLogging extends JavaPlugin {
         regionManager = new RegionManager(this);
         regionManager.load();
 
+        // Initialize region visualizer if WorldGuard is enabled
+        if (worldGuardEnabled && getConfig().getBoolean("region-visualizer.enabled", true)) {
+            regionVisualizer = new RegionBorderVisualizer(this);
+            regionVisualizer.start();
+            getLogger().info("Region border visualizer started!");
+        }
+
         // Register listeners
         getServer().getPluginManager().registerEvents(new CombatListener(this, combatManager), this);
         getServer().getPluginManager().registerEvents(new ProtectionListener(this, protectionManager), this);
 
         // Only register RegionListener if WorldGuard is present
         if (worldGuardEnabled) {
-            getServer().getPluginManager().registerEvents(new RegionListener(this, combatManager), this);
+            getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionListener(this, combatManager), this);
+            getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionVisualizerListener(this), this);
         }
 
         // Start item clear task if enabled
@@ -69,12 +79,18 @@ public final class BetterCombatLogging extends JavaPlugin {
         getCommand("setcombatduration").setExecutor(new CombatDurationCommand(this));
         getCommand("cleanup").setExecutor(new CleanupCommand(this));
         getCommand("itemclear").setExecutor(new ItemClearCommand(this));
+        getCommand("togglevisualizer").setExecutor(new net.saturn.commands.ToggleVisualizerCommand(this));
 
         getLogger().info("BetterCombatLogging has been enabled!");
     }
 
     @Override
     public void onDisable() {
+        // Stop region visualizer
+        if (regionVisualizer != null) {
+            regionVisualizer.stop();
+        }
+
         // Cancel all combat timers
         if (combatManager != null) {
             combatManager.shutdown();
@@ -108,6 +124,10 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     public RegionManager getRegionManager() {
         return regionManager;
+    }
+
+    public RegionBorderVisualizer getRegionVisualizer() {
+        return regionVisualizer;
     }
 
     public boolean isWorldGuardEnabled() {
