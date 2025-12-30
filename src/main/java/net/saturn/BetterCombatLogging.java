@@ -1,6 +1,7 @@
 package net.saturn;
 
 import net.saturn.commands.BlockedRegionCommand;
+import net.saturn.commands.CleanupCommand;
 import net.saturn.commands.combat.CombatCommand;
 import net.saturn.commands.combat.CombatDurationCommand;
 import net.saturn.commands.combat.CombatTestCommand;
@@ -56,6 +57,7 @@ public final class BetterCombatLogging extends JavaPlugin {
         getCommand("blockedregion").setExecutor(new BlockedRegionCommand(this, regionManager));
         getCommand("activatecombat").setExecutor(new CombatTestCommand(combatManager));
         getCommand("setcombatduration").setExecutor(new CombatDurationCommand(this));
+        getCommand("cleanup").setExecutor(new CleanupCommand(this));
 
         getLogger().info("BetterCombatLogging has been enabled!");
     }
