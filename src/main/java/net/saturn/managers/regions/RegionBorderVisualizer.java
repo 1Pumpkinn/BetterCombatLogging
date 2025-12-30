@@ -90,7 +90,7 @@ public class RegionBorderVisualizer {
         // Add new blocks
         for (Location loc : newBlocks) {
             if (!oldBlocks.contains(loc)) {
-                player.sendBlockChange(loc, Material.RED_STAINED_GLASS_PANE.createBlockData());
+                player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
             }
         }
 
@@ -138,41 +138,54 @@ public class RegionBorderVisualizer {
         int maxY = max.getY();
         int maxZ = max.getZ();
 
-        // Create border outline (edges only, not full walls)
-        // This creates a wireframe effect with glass panes
+        int playerY = playerLoc.getBlockY();
+        int verticalRange = plugin.getConfig().getInt("region-visualizer.distance", 5);
 
-        // Bottom and top horizontal edges
+        // Calculate the Y range to show (only show blocks near player's height)
+        int visualMinY = Math.max(minY + 1, playerY - verticalRange);
+        int visualMaxY = Math.min(maxY, playerY + verticalRange);
+
+        // Ensure we always show at least ground level
+        visualMinY = Math.max(minY + 1, visualMinY);
+
+        // Create full walls (not just edges) so glass panes connect
+        // North wall (minZ)
         for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                // Only add corners and edges, not the entire face
-                if (x == minX || x == maxX || z == minZ || z == maxZ) {
-                    blocks.add(new Location(playerLoc.getWorld(), x, minY, z));
-                    blocks.add(new Location(playerLoc.getWorld(), x, maxY, z));
+            for (int y = visualMinY; y <= visualMaxY; y++) {
+                Location loc = new Location(playerLoc.getWorld(), x, y, minZ);
+                if (loc.getBlock().getType() == Material.AIR) {
+                    blocks.add(loc);
                 }
             }
         }
 
-        // Vertical edges
-        for (int y = minY + 1; y < maxY; y++) {
-            // Four vertical edges
-            blocks.add(new Location(playerLoc.getWorld(), minX, y, minZ));
-            blocks.add(new Location(playerLoc.getWorld(), minX, y, maxZ));
-            blocks.add(new Location(playerLoc.getWorld(), maxX, y, minZ));
-            blocks.add(new Location(playerLoc.getWorld(), maxX, y, maxZ));
-        }
-
-        // Add middle horizontal lines for visibility (every 4 blocks)
-        for (int x = minX; x <= maxX; x += 4) {
-            for (int y = minY; y <= maxY; y++) {
-                blocks.add(new Location(playerLoc.getWorld(), x, y, minZ));
-                blocks.add(new Location(playerLoc.getWorld(), x, y, maxZ));
+        // South wall (maxZ)
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = visualMinY; y <= visualMaxY; y++) {
+                Location loc = new Location(playerLoc.getWorld(), x, y, maxZ);
+                if (loc.getBlock().getType() == Material.AIR) {
+                    blocks.add(loc);
+                }
             }
         }
 
-        for (int z = minZ; z <= maxZ; z += 4) {
-            for (int y = minY; y <= maxY; y++) {
-                blocks.add(new Location(playerLoc.getWorld(), minX, y, z));
-                blocks.add(new Location(playerLoc.getWorld(), maxX, y, z));
+        // West wall (minX)
+        for (int z = minZ; z <= maxZ; z++) {
+            for (int y = visualMinY; y <= visualMaxY; y++) {
+                Location loc = new Location(playerLoc.getWorld(), minX, y, z);
+                if (loc.getBlock().getType() == Material.AIR) {
+                    blocks.add(loc);
+                }
+            }
+        }
+
+        // East wall (maxX)
+        for (int z = minZ; z <= maxZ; z++) {
+            for (int y = visualMinY; y <= visualMaxY; y++) {
+                Location loc = new Location(playerLoc.getWorld(), maxX, y, z);
+                if (loc.getBlock().getType() == Material.AIR) {
+                    blocks.add(loc);
+                }
             }
         }
 
