@@ -9,7 +9,7 @@ import net.saturn.commands.combat.CombatTestCommand;
 import net.saturn.commands.limitations.ProtectionLimitCommand;
 import net.saturn.listeners.CombatListener;
 import net.saturn.listeners.ProtectionListener;
-import net.saturn.listeners.regions.RegionListener;
+import net.saturn.listeners.regions.InteractionListener;
 import net.saturn.managers.CombatManager;
 import net.saturn.managers.ProtectionManager;
 import net.saturn.managers.regions.RegionBorderVisualizer;
@@ -66,6 +66,7 @@ public final class BetterCombatLogging extends JavaPlugin {
             getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionVisualizerListener(this), this);
             getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionVehicleListener(this), this);
             getServer().getPluginManager().registerEvents(new net.saturn.listeners.regions.RegionBlockBreakListener(this), this);
+            getServer().getPluginManager().registerEvents(new InteractionListener(this), this);
         }
 
         // Start item clear task if enabled

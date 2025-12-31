@@ -63,6 +63,8 @@ messages:
   combat-exit: "&a✔ You are no longer in combat!"
   combat-logout: "&e{player} &clogged out during combat and died!"
   region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
+  region-ejected: "&cYou were ejected from a blocked region! &7({time}s remaining)"
+  visualizer-blocked: "&cDon't try to break through the barrier! &7({time}s remaining)"
   vehicle-blocked: "&cYou cannot enter this region in a vehicle while in combat! &7({time}s remaining)"
   boss-bar: "&c⚔ Combat: {time}s"
   item-clear-warning: "&eItems will be cleared in {time} seconds!"
