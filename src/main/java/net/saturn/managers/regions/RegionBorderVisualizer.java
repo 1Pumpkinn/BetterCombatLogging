@@ -68,7 +68,7 @@ public class RegionBorderVisualizer {
                         .get(BukkitAdapter.adapt(player.getWorld()));
 
                 if (regionManager != null) {
-                    int distance = plugin.getConfig().getInt("region-visualizer.distance", 5);
+                    int distance = plugin.getConfig().getInt("region-visualizer.distance", 15);
 
                     for (String regionName : blockedRegions) {
                         ProtectedRegion region = regionManager.getRegion(regionName);

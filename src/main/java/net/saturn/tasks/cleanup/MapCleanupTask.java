@@ -21,9 +21,60 @@ public class MapCleanupTask extends BukkitRunnable {
         this.blocksToRemove = new HashSet<>();
 
         // Add materials to remove
+        // Blocks
+        blocksToRemove.add(Material.PALE_OAK_LOG);
+        blocksToRemove.add(Material.PALE_OAK_PLANKS);
+        blocksToRemove.add(Material.PALE_OAK_STAIRS);
+        blocksToRemove.add(Material.PALE_OAK_SLAB);
+        blocksToRemove.add(Material.PALE_OAK_FENCE);
+        blocksToRemove.add(Material.PALE_OAK_FENCE_GATE);
+        blocksToRemove.add(Material.PALE_OAK_SHELF);
+        blocksToRemove.add(Material.PALE_OAK_SIGN);
+        blocksToRemove.add(Material.PALE_OAK_TRAPDOOR);
+        blocksToRemove.add(Material.PALE_OAK_PRESSURE_PLATE);
+        blocksToRemove.add(Material.PALE_OAK_BUTTON);
+
+        blocksToRemove.add(Material.CRIMSON_HYPHAE);
+        blocksToRemove.add(Material.CRIMSON_PLANKS);
+        blocksToRemove.add(Material.CRIMSON_STAIRS);
+        blocksToRemove.add(Material.CRIMSON_PRESSURE_PLATE);
+        blocksToRemove.add(Material.CRIMSON_FENCE);
+        blocksToRemove.add(Material.CRIMSON_FENCE_GATE);
+        blocksToRemove.add(Material.CRIMSON_SIGN);
+        blocksToRemove.add(Material.CRIMSON_TRAPDOOR);
+        blocksToRemove.add(Material.CRIMSON_DOOR);
+        blocksToRemove.add(Material.CRIMSON_BUTTON);
+
+        blocksToRemove.add(Material.COBBLESTONE );
+        blocksToRemove.add(Material.COBBLESTONE_STAIRS);
+        blocksToRemove.add(Material.COBBLESTONE_SLAB);
+        blocksToRemove.add(Material.COBBLESTONE_WALL);
+
+        // Ores
+        blocksToRemove.add(Material.IRON_BLOCK);
+        blocksToRemove.add(Material.GOLD_BLOCK);
+        blocksToRemove.add(Material.COAL_BLOCK);
+        blocksToRemove.add(Material.REDSTONE_BLOCK);
+        blocksToRemove.add(Material.EMERALD_BLOCK);
+        blocksToRemove.add(Material.LAPIS_BLOCK);
+        blocksToRemove.add(Material.COPPER_BLOCK);
+        blocksToRemove.add(Material.EXPOSED_COPPER);
+        blocksToRemove.add(Material.WEATHERED_COPPER);
+        blocksToRemove.add(Material.OXIDIZED_COPPER);
+        blocksToRemove.add(Material.DIAMOND_BLOCK);
+        blocksToRemove.add(Material.NETHERITE_BLOCK);
+        blocksToRemove.add(Material.ANCIENT_DEBRIS);
+
+        // Util
         blocksToRemove.add(Material.COBWEB);
+
+        // Fluids
         blocksToRemove.add(Material.WATER);
         blocksToRemove.add(Material.LAVA);
+
+        // Entities
+        blocksToRemove.add(Material.PALE_OAK_BOAT);
+        blocksToRemove.add(Material.PALE_OAK_CHEST_BOAT);
     }
 
     @Override

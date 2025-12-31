@@ -19,7 +19,7 @@ region-visualizer:
   # Enable region border visualization when in combat
   enabled: true
   # Distance (in blocks) at which players can see the visualizer
-  distance: 5
+  distance: 15
 
 # NOTE: Blocked regions are now managed with the /blockedregion command!
 # Use /blockedregion add <region> to block regions
