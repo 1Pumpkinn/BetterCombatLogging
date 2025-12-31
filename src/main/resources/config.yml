@@ -2,7 +2,6 @@
 
 # Combat duration in seconds
 combat-duration: 15
-clear-interval-minutes: 20
 
 # Enable PvP combat tagging
 enable-pvp-combat: true
@@ -10,21 +9,53 @@ enable-pvp-combat: true
 # Broadcast when someone logs out during combat
 broadcast-combat-log: true
 
-warning-seconds: 30
-announce-warning: true
-announce-clear: true
-
-# Region Visualizer Settings
+# Region Visualizer Settings (Optimized for Performance)
 region-visualizer:
   # Enable region border visualization when in combat
   enabled: true
   # Distance (in blocks) at which players can see the visualizer
   distance: 15
+  # Vertical range above/below player to show glass
+  vertical-range: 15
+  # Note: Spacing removed - all blocks are rendered to prevent wind charge float glitch
 
-# NOTE: Blocked regions are now managed with the /blockedregion command!
-# Use /blockedregion add <region> to block regions
-# Use /blockedregion list to see all blocked regions
-# The blocked-regions list below is only used for initial migration
+# Map Cleanup Settings
+cleanup:
+  # Enable automatic cleanup
+  enabled: true
+  # Cleanup interval in minutes
+  interval-minutes: 30
+  # Broadcast cleanup messages
+  broadcast-cleanup: true
+  # World-specific settings
+  worlds:
+    world:
+      enabled: true
+    world_nether:
+      enabled: true
+    world_the_end:
+      enabled: true
+
+# Item Clear Settings
+item-clear:
+  # Enable automatic item clearing
+  enabled: true
+  # Clear interval in minutes
+  interval-minutes: 20
+  # Warn players before clearing
+  announce-warning: true
+  # Warning time in seconds
+  warning-seconds: 30
+  # Announce when items are cleared
+  announce-clear: true
+  # World-specific settings
+  worlds:
+    world:
+      enabled: true
+    world_nether:
+      enabled: true
+    world_the_end:
+      enabled: true
 
 # Messages (Use & for color codes)
 messages:
@@ -32,9 +63,11 @@ messages:
   combat-exit: "&a✔ You are no longer in combat!"
   combat-logout: "&e{player} &clogged out during combat and died!"
   region-blocked: "&cYou cannot enter this region while in combat! &7({time}s remaining)"
+  vehicle-blocked: "&cYou cannot enter this region in a vehicle while in combat! &7({time}s remaining)"
   boss-bar: "&c⚔ Combat: {time}s"
-  warning: "&eItems will be cleared in {time} seconds!"
-  cleared: "&aAll items have been cleared from the ground!"
+  item-clear-warning: "&eItems will be cleared in {time} seconds!"
+  item-clear-complete: "&aCleared {count} items from the ground!"
+  cleanup-complete: "&a✔ Map cleanup completed in {world}! Removed {count} blocks."
   protection-limited: "&eYour item's Protection enchantment has been limited to the maximum allowed level."
   protection-limit-set: "&eProtection enchantment has been limited to level {level} globally!"
   protection-limit-removed: "&eProtection enchantment limit has been removed globally!"

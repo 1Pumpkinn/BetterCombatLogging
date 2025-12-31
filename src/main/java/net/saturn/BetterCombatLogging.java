@@ -1,7 +1,7 @@
 package net.saturn;
 
 import net.saturn.commands.BlockedRegionCommand;
-import net.saturn.commands.cleanup.CleanupCommand;
+import net.saturn.commands.cleanup.MapCleanCommand;
 import net.saturn.commands.cleanup.ItemClearCommand;
 import net.saturn.commands.combat.CombatCommand;
 import net.saturn.commands.combat.CombatDurationCommand;
@@ -15,6 +15,7 @@ import net.saturn.managers.ProtectionManager;
 import net.saturn.managers.regions.RegionBorderVisualizer;
 import net.saturn.managers.regions.RegionManager;
 import net.saturn.tasks.cleanup.ItemClearTask;
+import net.saturn.tasks.cleanup.MapCleanupScheduler;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class BetterCombatLogging extends JavaPlugin {
@@ -24,6 +25,7 @@ public final class BetterCombatLogging extends JavaPlugin {
     private RegionManager regionManager;
     private RegionBorderVisualizer regionVisualizer;
     private ItemClearTask itemClearTask;
+    private MapCleanupScheduler mapCleanupScheduler;
     private boolean worldGuardEnabled = false;
 
     @Override
@@ -51,7 +53,7 @@ public final class BetterCombatLogging extends JavaPlugin {
         if (worldGuardEnabled && getConfig().getBoolean("region-visualizer.enabled", true)) {
             regionVisualizer = new RegionBorderVisualizer(this);
             regionVisualizer.start();
-            getLogger().info("Region border visualizer started!");
+            getLogger().info("Region border visualizer started with optimized rendering!");
         }
 
         // Register listeners
@@ -73,17 +75,27 @@ public final class BetterCombatLogging extends JavaPlugin {
             getLogger().info("Item clear task started!");
         }
 
+        // Start map cleanup scheduler if enabled
+        if (getConfig().getBoolean("cleanup.enabled", true)) {
+            int intervalMinutes = getConfig().getInt("cleanup.interval-minutes", 30);
+            long intervalTicks = intervalMinutes * 60L * 20L; // Convert minutes to ticks
+
+            mapCleanupScheduler = new MapCleanupScheduler(this);
+            mapCleanupScheduler.runTaskTimer(this, intervalTicks, intervalTicks);
+            getLogger().info("Map cleanup scheduler started! Running every " + intervalMinutes + " minutes.");
+        }
+
         // Register commands
         getCommand("combat").setExecutor(new CombatCommand(combatManager));
         getCommand("protectionlimit").setExecutor(new ProtectionLimitCommand(this, protectionManager));
         getCommand("blockedregion").setExecutor(new BlockedRegionCommand(this, regionManager));
         getCommand("activatecombat").setExecutor(new CombatTestCommand(combatManager));
         getCommand("setcombatduration").setExecutor(new CombatDurationCommand(this));
-        getCommand("cleanup").setExecutor(new CleanupCommand(this));
+        getCommand("mapclean").setExecutor(new MapCleanCommand(this));
         getCommand("itemclear").setExecutor(new ItemClearCommand(this));
         getCommand("togglevisualizer").setExecutor(new net.saturn.commands.ToggleVisualizerCommand(this));
 
-        getLogger().info("BetterCombatLogging has been enabled!");
+        getLogger().info("BetterCombatLogging has been enabled with optimized performance!");
     }
 
     @Override
@@ -111,6 +123,11 @@ public final class BetterCombatLogging extends JavaPlugin {
         // Cancel item clear task
         if (itemClearTask != null) {
             itemClearTask.cancel();
+        }
+
+        // Cancel map cleanup scheduler
+        if (mapCleanupScheduler != null) {
+            mapCleanupScheduler.cancel();
         }
 
         getLogger().info("BetterCombatLogging has been disabled!");

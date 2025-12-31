@@ -12,13 +12,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class CleanupCommand implements CommandExecutor, TabCompleter {
+public class MapCleanCommand implements CommandExecutor, TabCompleter {
 
     private final BetterCombatLogging plugin;
     private long lastCleanup = 0;
-    private static final long COOLDOWN_MS = 5000; // 5 second cooldown
+    private static final long COOLDOWN_MS = 30000; // 30 second cooldown for manual cleanup
 
-    public CleanupCommand(BetterCombatLogging plugin) {
+    public MapCleanCommand(BetterCombatLogging plugin) {
         this.plugin = plugin;
     }
 
@@ -38,6 +38,7 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
         switch (subCommand) {
             case "now":
             case "run":
+            case "start":
                 return handleCleanup(sender);
             case "toggle":
                 return handleToggle(sender);
@@ -60,11 +61,12 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        sender.sendMessage(colorize("&eStarting manual map cleanup..."));
+        sender.sendMessage(colorize("&eStarting map cleanup within world borders..."));
+        sender.sendMessage(colorize("&7This process will run gradually to avoid lag."));
 
-        // Run cleanup task synchronously
+        // Run cleanup task
         MapCleanupTask cleanupTask = new MapCleanupTask(plugin);
-        cleanupTask.run();
+        cleanupTask.runTask(plugin);
 
         lastCleanup = currentTime;
         return true;
@@ -82,7 +84,7 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(colorize("&7The cleanup task will restart on next server reload."));
         } else {
             sender.sendMessage(colorize("&cAutomatic map cleanup has been &ndisabled&r&c!"));
-            sender.sendMessage(colorize("&7You can still run manual cleanups with /cleanup"));
+            sender.sendMessage(colorize("&7You can still run manual cleanups with /mapclean"));
         }
 
         return true;
@@ -92,7 +94,7 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
         if (args.length < 2) {
             int current = plugin.getConfig().getInt("cleanup.interval-minutes", 30);
             sender.sendMessage(colorize("&eCurrent cleanup interval: &6" + current + " minutes"));
-            sender.sendMessage(colorize("&7Usage: /cleanup interval <minutes>"));
+            sender.sendMessage(colorize("&7Usage: /mapclean interval <minutes>"));
             return true;
         }
 
@@ -104,8 +106,8 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (minutes < 1) {
-            sender.sendMessage(colorize("&cInterval must be at least 1 minute!"));
+        if (minutes < 5) {
+            sender.sendMessage(colorize("&cInterval must be at least 5 minutes!"));
             return true;
         }
 
@@ -128,11 +130,12 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
         int interval = plugin.getConfig().getInt("cleanup.interval-minutes", 30);
         boolean broadcast = plugin.getConfig().getBoolean("cleanup.broadcast-cleanup", true);
 
-        sender.sendMessage(colorize("&6&m----------&r &e&lCleanup Status &6&m----------"));
+        sender.sendMessage(colorize("&6&m----------&r &e&lMap Cleanup Status &6&m----------"));
         sender.sendMessage(colorize("&7Enabled: " + (enabled ? "&aYes" : "&cNo")));
         sender.sendMessage(colorize("&7Interval: &e" + interval + " minutes"));
         sender.sendMessage(colorize("&7Broadcast: " + (broadcast ? "&aYes" : "&cNo")));
-        sender.sendMessage(colorize("&7Blocks Removed: &eCobwebs, Water, Lava"));
+        sender.sendMessage(colorize("&7Area: &eWorld Border bounds only"));
+        sender.sendMessage(colorize("&7Mode: &eGradual (10 chunks/tick)"));
         sender.sendMessage(colorize("&6&m---------------------------------------"));
 
         return true;
@@ -140,11 +143,12 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(colorize("&6&m----------&r &e&lMap Cleanup &6&m----------"));
-        sender.sendMessage(colorize("&e/cleanup &7- Run cleanup immediately"));
-        sender.sendMessage(colorize("&e/cleanup now &7- Run cleanup immediately"));
-        sender.sendMessage(colorize("&e/cleanup toggle &7- Enable/disable auto cleanup"));
-        sender.sendMessage(colorize("&e/cleanup interval <minutes> &7- Set cleanup interval"));
-        sender.sendMessage(colorize("&e/cleanup status &7- View cleanup settings"));
+        sender.sendMessage(colorize("&e/mapclean &7- Run cleanup immediately"));
+        sender.sendMessage(colorize("&e/mapclean now &7- Run cleanup immediately"));
+        sender.sendMessage(colorize("&e/mapclean toggle &7- Enable/disable auto cleanup"));
+        sender.sendMessage(colorize("&e/mapclean interval <minutes> &7- Set cleanup interval"));
+        sender.sendMessage(colorize("&e/mapclean status &7- View cleanup settings"));
+        sender.sendMessage(colorize("&7Cleans within world border bounds only"));
         sender.sendMessage(colorize("&6&m---------------------------------------"));
     }
 
@@ -157,7 +161,7 @@ public class CleanupCommand implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            completions.addAll(Arrays.asList("now", "run", "toggle", "interval", "status"));
+            completions.addAll(Arrays.asList("now", "run", "start", "toggle", "interval", "status"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("interval")) {
             completions.addAll(Arrays.asList("5", "10", "15", "30", "60"));
         }

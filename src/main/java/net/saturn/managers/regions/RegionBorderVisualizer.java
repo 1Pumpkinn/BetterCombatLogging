@@ -4,7 +4,6 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.protection.managers.RegionManager;
-import com.sk89q.worldguard.protection.regions.ProtectedCuboidRegion;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import net.saturn.BetterCombatLogging;
 import org.bukkit.Location;
@@ -18,23 +17,35 @@ public class RegionBorderVisualizer {
 
     private final BetterCombatLogging plugin;
     private final Map<UUID, Set<Location>> playerVisibleBlocks;
+    private final Map<UUID, Long> lastUpdate;
     private BukkitRunnable updateTask;
+    private static final long UPDATE_INTERVAL_MS = 500; // Update every 500ms per player
 
     public RegionBorderVisualizer(BetterCombatLogging plugin) {
         this.plugin = plugin;
         this.playerVisibleBlocks = new HashMap<>();
+        this.lastUpdate = new HashMap<>();
     }
 
     public void start() {
         updateTask = new BukkitRunnable() {
             @Override
             public void run() {
+                long currentTime = System.currentTimeMillis();
+
                 for (Player player : plugin.getServer().getOnlinePlayers()) {
-                    updatePlayerView(player);
+                    UUID uuid = player.getUniqueId();
+                    long lastUpdateTime = lastUpdate.getOrDefault(uuid, 0L);
+
+                    // Only update if enough time has passed since last update
+                    if (currentTime - lastUpdateTime >= UPDATE_INTERVAL_MS) {
+                        updatePlayerView(player);
+                        lastUpdate.put(uuid, currentTime);
+                    }
                 }
             }
         };
-        updateTask.runTaskTimer(plugin, 0L, 10L); // Update every 0.5 seconds
+        updateTask.runTaskTimer(plugin, 0L, 5L); // Run every 5 ticks (0.25s)
     }
 
     public void stop() {
@@ -47,6 +58,7 @@ public class RegionBorderVisualizer {
             clearPlayerView(player);
         }
         playerVisibleBlocks.clear();
+        lastUpdate.clear();
     }
 
     private void updatePlayerView(Player player) {
@@ -80,31 +92,60 @@ public class RegionBorderVisualizer {
             }
         }
 
-        // Remove blocks that are no longer visible
+        // Batch send block changes for better performance
+        List<Location> toRemove = new ArrayList<>();
+        List<Location> toAdd = new ArrayList<>();
+
+        // Find blocks to remove
         for (Location loc : oldBlocks) {
             if (!newBlocks.contains(loc)) {
-                player.sendBlockChange(loc, loc.getBlock().getBlockData());
+                toRemove.add(loc);
             }
         }
 
-        // Add new blocks
+        // Find blocks to add
         for (Location loc : newBlocks) {
             if (!oldBlocks.contains(loc)) {
-                player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
+                toAdd.add(loc);
             }
         }
 
+        // Send changes in batches
+        sendBlockChanges(player, toRemove, false);
+        sendBlockChanges(player, toAdd, true);
+
         playerVisibleBlocks.put(uuid, newBlocks);
+    }
+
+    private void sendBlockChanges(Player player, List<Location> locations, boolean isGlass) {
+        if (locations.isEmpty()) {
+            return;
+        }
+
+        // Process in smaller batches to avoid overwhelming client
+        int batchSize = 50;
+        for (int i = 0; i < locations.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, locations.size());
+            List<Location> batch = locations.subList(i, end);
+
+            for (Location loc : batch) {
+                if (isGlass) {
+                    player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
+                } else {
+                    player.sendBlockChange(loc, loc.getBlock().getBlockData());
+                }
+            }
+        }
     }
 
     public void clearPlayerView(Player player) {
         UUID uuid = player.getUniqueId();
         Set<Location> blocks = playerVisibleBlocks.remove(uuid);
+        lastUpdate.remove(uuid);
 
-        if (blocks != null) {
-            for (Location loc : blocks) {
-                player.sendBlockChange(loc, loc.getBlock().getBlockData());
-            }
+        if (blocks != null && !blocks.isEmpty()) {
+            List<Location> blockList = new ArrayList<>(blocks);
+            sendBlockChanges(player, blockList, false);
         }
     }
 
@@ -145,7 +186,7 @@ public class RegionBorderVisualizer {
         int maxZ = max.getZ();
 
         int playerY = playerLoc.getBlockY();
-        int verticalRange = plugin.getConfig().getInt("region-visualizer.distance", 5);
+        int verticalRange = plugin.getConfig().getInt("region-visualizer.vertical-range", 5);
 
         // Calculate the Y range to show (only show blocks near player's height)
         int visualMinY = Math.max(minY + 1, playerY - verticalRange);
@@ -154,7 +195,7 @@ public class RegionBorderVisualizer {
         // Ensure we always show at least ground level
         visualMinY = Math.max(minY + 1, visualMinY);
 
-        // Create full walls (not just edges) so glass panes connect
+        // Render all blocks with no spacing to prevent glitches (wind charge float exploit)
         // North wall (minZ)
         for (int x = minX; x <= maxX; x++) {
             for (int y = visualMinY; y <= visualMaxY; y++) {
