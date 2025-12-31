@@ -37,7 +37,6 @@ public class RegionBorderVisualizer {
                     UUID uuid = player.getUniqueId();
                     long lastUpdateTime = lastUpdate.getOrDefault(uuid, 0L);
 
-                    // Only update if enough time has passed since last update
                     if (currentTime - lastUpdateTime >= UPDATE_INTERVAL_MS) {
                         updatePlayerView(player);
                         lastUpdate.put(uuid, currentTime);
@@ -53,7 +52,6 @@ public class RegionBorderVisualizer {
             updateTask.cancel();
         }
 
-        // Clear all fake blocks for all players
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             clearPlayerView(player);
         }
@@ -63,17 +61,11 @@ public class RegionBorderVisualizer {
 
     private void updatePlayerView(Player player) {
         UUID uuid = player.getUniqueId();
-
-        // Clear old blocks
         Set<Location> oldBlocks = playerVisibleBlocks.getOrDefault(uuid, new HashSet<>());
-
-        // Get new blocks to show
         Set<Location> newBlocks = new HashSet<>();
 
-        // Only show if player is in combat
         if (plugin.getCombatManager().isInCombat(player)) {
             List<String> blockedRegions = plugin.getRegionManager().getBlockedRegions();
-
             if (!blockedRegions.isEmpty()) {
                 RegionManager regionManager = WorldGuard.getInstance().getPlatform()
                         .getRegionContainer()
@@ -81,7 +73,6 @@ public class RegionBorderVisualizer {
 
                 if (regionManager != null) {
                     int distance = plugin.getConfig().getInt("region-visualizer.distance", 15);
-
                     for (String regionName : blockedRegions) {
                         ProtectedRegion region = regionManager.getRegion(regionName);
                         if (region != null && isPlayerNearRegion(player.getLocation(), region, distance)) {
@@ -92,42 +83,28 @@ public class RegionBorderVisualizer {
             }
         }
 
-        // Batch send block changes for better performance
+        // Determine which blocks to add/remove
         List<Location> toRemove = new ArrayList<>();
         List<Location> toAdd = new ArrayList<>();
 
-        // Find blocks to remove
-        for (Location loc : oldBlocks) {
-            if (!newBlocks.contains(loc)) {
-                toRemove.add(loc);
-            }
-        }
+        for (Location loc : oldBlocks) if (!newBlocks.contains(loc)) toRemove.add(loc);
+        for (Location loc : newBlocks) if (!oldBlocks.contains(loc)) toAdd.add(loc);
 
-        // Find blocks to add
-        for (Location loc : newBlocks) {
-            if (!oldBlocks.contains(loc)) {
-                toAdd.add(loc);
-            }
-        }
-
-        // Send changes in batches
+        // Send changes
         sendBlockChanges(player, toRemove, false);
         sendBlockChanges(player, toAdd, true);
 
+        // Store new set
         playerVisibleBlocks.put(uuid, newBlocks);
     }
 
     private void sendBlockChanges(Player player, List<Location> locations, boolean isGlass) {
-        if (locations.isEmpty()) {
-            return;
-        }
-
-        // Process in smaller batches to avoid overwhelming client
+        if (locations.isEmpty()) return;
         int batchSize = 50;
+
         for (int i = 0; i < locations.size(); i += batchSize) {
             int end = Math.min(i + batchSize, locations.size());
             List<Location> batch = locations.subList(i, end);
-
             for (Location loc : batch) {
                 if (isGlass) {
                     player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
@@ -142,11 +119,7 @@ public class RegionBorderVisualizer {
         UUID uuid = player.getUniqueId();
         Set<Location> blocks = playerVisibleBlocks.remove(uuid);
         lastUpdate.remove(uuid);
-
-        if (blocks != null && !blocks.isEmpty()) {
-            List<Location> blockList = new ArrayList<>(blocks);
-            sendBlockChanges(player, blockList, false);
-        }
+        if (blocks != null && !blocks.isEmpty()) sendBlockChanges(player, new ArrayList<>(blocks), false);
     }
 
     public boolean isVisualizerBlock(Player player, Location location) {
@@ -155,16 +128,20 @@ public class RegionBorderVisualizer {
         return blocks != null && blocks.contains(location);
     }
 
+    public void refresh(Player player) {
+        Set<Location> blocks = playerVisibleBlocks.get(player.getUniqueId());
+        if (blocks == null) return;
+        for (Location loc : blocks) player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
+    }
+
     private boolean isPlayerNearRegion(Location playerLoc, ProtectedRegion region, int distance) {
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
 
-        // Calculate the closest point in the region to the player
         double closestX = Math.max(min.getX(), Math.min(playerLoc.getX(), max.getX()));
         double closestY = Math.max(min.getY(), Math.min(playerLoc.getY(), max.getY()));
         double closestZ = Math.max(min.getZ(), Math.min(playerLoc.getZ(), max.getZ()));
 
-        // Calculate distance from player to closest point
         double distanceSquared = Math.pow(playerLoc.getX() - closestX, 2) +
                 Math.pow(playerLoc.getY() - closestY, 2) +
                 Math.pow(playerLoc.getZ() - closestZ, 2);
@@ -174,65 +151,29 @@ public class RegionBorderVisualizer {
 
     private Set<Location> getRegionBorderBlocks(ProtectedRegion region, Location playerLoc) {
         Set<Location> blocks = new HashSet<>();
-
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
 
-        int minX = min.getX();
-        int minY = min.getY();
-        int minZ = min.getZ();
-        int maxX = max.getX();
-        int maxY = max.getY();
-        int maxZ = max.getZ();
-
+        int minX = min.getX(), minY = min.getY(), minZ = min.getZ();
+        int maxX = max.getX(), maxY = max.getY(), maxZ = max.getZ();
         int playerY = playerLoc.getBlockY();
         int verticalRange = plugin.getConfig().getInt("region-visualizer.vertical-range", 5);
-
-        // Calculate the Y range to show (only show blocks near player's height)
         int visualMinY = Math.max(minY + 1, playerY - verticalRange);
         int visualMaxY = Math.min(maxY, playerY + verticalRange);
 
-        // Ensure we always show at least ground level
-        visualMinY = Math.max(minY + 1, visualMinY);
-
-        // Render all blocks with no spacing to prevent glitches (wind charge float exploit)
-        // North wall (minZ)
+        // North/South walls
         for (int x = minX; x <= maxX; x++) {
             for (int y = visualMinY; y <= visualMaxY; y++) {
-                Location loc = new Location(playerLoc.getWorld(), x, y, minZ);
-                if (loc.getBlock().getType() == Material.AIR) {
-                    blocks.add(loc);
-                }
+                blocks.add(new Location(playerLoc.getWorld(), x, y, minZ));
+                blocks.add(new Location(playerLoc.getWorld(), x, y, maxZ));
             }
         }
 
-        // South wall (maxZ)
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = visualMinY; y <= visualMaxY; y++) {
-                Location loc = new Location(playerLoc.getWorld(), x, y, maxZ);
-                if (loc.getBlock().getType() == Material.AIR) {
-                    blocks.add(loc);
-                }
-            }
-        }
-
-        // West wall (minX)
+        // West/East walls
         for (int z = minZ; z <= maxZ; z++) {
             for (int y = visualMinY; y <= visualMaxY; y++) {
-                Location loc = new Location(playerLoc.getWorld(), minX, y, z);
-                if (loc.getBlock().getType() == Material.AIR) {
-                    blocks.add(loc);
-                }
-            }
-        }
-
-        // East wall (maxX)
-        for (int z = minZ; z <= maxZ; z++) {
-            for (int y = visualMinY; y <= visualMaxY; y++) {
-                Location loc = new Location(playerLoc.getWorld(), maxX, y, z);
-                if (loc.getBlock().getType() == Material.AIR) {
-                    blocks.add(loc);
-                }
+                blocks.add(new Location(playerLoc.getWorld(), minX, y, z));
+                blocks.add(new Location(playerLoc.getWorld(), maxX, y, z));
             }
         }
 
