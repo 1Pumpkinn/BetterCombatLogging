@@ -8,6 +8,7 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import net.saturn.BetterCombatLogging;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -18,6 +19,7 @@ public class RegionBorderVisualizer {
     private final BetterCombatLogging plugin;
     private final Map<UUID, Set<Location>> playerVisibleBlocks;
     private final Map<UUID, Long> lastUpdate;
+    private final Map<UUID, Map<Location, Material>> originalBlockTypes; // Store original block types
     private BukkitRunnable updateTask;
     private static final long UPDATE_INTERVAL_MS = 500; // Update every 500ms per player
 
@@ -25,6 +27,7 @@ public class RegionBorderVisualizer {
         this.plugin = plugin;
         this.playerVisibleBlocks = new HashMap<>();
         this.lastUpdate = new HashMap<>();
+        this.originalBlockTypes = new HashMap<>();
     }
 
     public void start() {
@@ -57,6 +60,7 @@ public class RegionBorderVisualizer {
         }
         playerVisibleBlocks.clear();
         lastUpdate.clear();
+        originalBlockTypes.clear();
     }
 
     private void updatePlayerView(Player player) {
@@ -81,6 +85,11 @@ public class RegionBorderVisualizer {
                     }
                 }
             }
+        } else {
+            // Player is not in combat, restore all original blocks
+            restoreOriginalBlocks(player);
+            playerVisibleBlocks.remove(uuid);
+            return;
         }
 
         // Determine which blocks to add/remove
@@ -101,25 +110,67 @@ public class RegionBorderVisualizer {
     private void sendBlockChanges(Player player, List<Location> locations, boolean isGlass) {
         if (locations.isEmpty()) return;
         int batchSize = 50;
+        UUID uuid = player.getUniqueId();
 
         for (int i = 0; i < locations.size(); i += batchSize) {
             int end = Math.min(i + batchSize, locations.size());
             List<Location> batch = locations.subList(i, end);
             for (Location loc : batch) {
                 if (isGlass) {
+                    // Store original block type before replacing
+                    if (!originalBlockTypes.containsKey(uuid)) {
+                        originalBlockTypes.put(uuid, new HashMap<>());
+                    }
+                    originalBlockTypes.get(uuid).put(loc, loc.getBlock().getType());
+
                     player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
                 } else {
-                    player.sendBlockChange(loc, loc.getBlock().getBlockData());
+                    // Restore original block type
+                    Map<Location, Material> playerOriginals = originalBlockTypes.get(uuid);
+                    if (playerOriginals != null && playerOriginals.containsKey(loc)) {
+                        Material originalType = playerOriginals.get(loc);
+                        player.sendBlockChange(loc, originalType.createBlockData());
+                        playerOriginals.remove(loc);
+                    } else {
+                        player.sendBlockChange(loc, loc.getBlock().getBlockData());
+                    }
                 }
             }
         }
     }
 
+    /**
+     * Restores all original blocks for a player
+     */
+    private void restoreOriginalBlocks(Player player) {
+        UUID uuid = player.getUniqueId();
+        Map<Location, Material> playerOriginals = originalBlockTypes.get(uuid);
+
+        if (playerOriginals == null || playerOriginals.isEmpty()) {
+            return;
+        }
+
+        List<Location> locations = new ArrayList<>(playerOriginals.keySet());
+        for (Location loc : locations) {
+            Material originalType = playerOriginals.get(loc);
+            player.sendBlockChange(loc, originalType.createBlockData());
+        }
+
+        originalBlockTypes.remove(uuid);
+    }
+
     public void clearPlayerView(Player player) {
         UUID uuid = player.getUniqueId();
+
+        // Restore original blocks before clearing
+        restoreOriginalBlocks(player);
+
         Set<Location> blocks = playerVisibleBlocks.remove(uuid);
         lastUpdate.remove(uuid);
-        if (blocks != null && !blocks.isEmpty()) sendBlockChanges(player, new ArrayList<>(blocks), false);
+
+        if (blocks != null && !blocks.isEmpty()) {
+            sendBlockChanges(player, new ArrayList<>(blocks), false);
+        }
     }
 
     public boolean isVisualizerBlock(Player player, Location location) {
@@ -131,7 +182,9 @@ public class RegionBorderVisualizer {
     public void refresh(Player player) {
         Set<Location> blocks = playerVisibleBlocks.get(player.getUniqueId());
         if (blocks == null) return;
-        for (Location loc : blocks) player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
+        for (Location loc : blocks) {
+            player.sendBlockChange(loc, Material.RED_STAINED_GLASS.createBlockData());
+        }
     }
 
     private boolean isPlayerNearRegion(Location playerLoc, ProtectedRegion region, int distance) {
