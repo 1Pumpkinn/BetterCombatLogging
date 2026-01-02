@@ -222,7 +222,7 @@ public class RegionBorderVisualizer {
             }
         }
 
-        // West/East walls
+        // West/East wall
         for (int z = minZ; z <= maxZ; z++) {
             for (int y = visualMinY; y <= visualMaxY; y++) {
                 blocks.add(new Location(playerLoc.getWorld(), minX, y, z));
