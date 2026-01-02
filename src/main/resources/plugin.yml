@@ -16,6 +16,12 @@ commands:
     usage: /<command> <set|remove|check> [level]
     permission: BetterCombatLogging.admin
 
+  itemlimit:
+    description: Manage item limitations
+    usage: /<command> <add|remove|list|check|clear> [item]
+    permission: BetterCombatLogging.admin
+    aliases: [il, limititem, itemban]
+
   blockedregion:
     description: Manage regions blocked during combat
     usage: /<command> <add|remove|list|clear> [region]

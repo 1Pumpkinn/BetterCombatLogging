@@ -7,6 +7,8 @@ import net.saturn.commands.combat.CombatCommand;
 import net.saturn.commands.combat.CombatDurationCommand;
 import net.saturn.commands.combat.CombatTestCommand;
 import net.saturn.commands.limitations.ProtectionLimitCommand;
+import net.saturn.limiter.listener.ItemLimitListener;
+import net.saturn.limiter.manager.ItemLimitManager;
 import net.saturn.listeners.CombatListener;
 import net.saturn.listeners.ProtectionListener;
 import net.saturn.listeners.regions.InteractionListener;
@@ -22,6 +24,7 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     private CombatManager combatManager;
     private ProtectionManager protectionManager;
+    private ItemLimitManager itemLimitManager;
     private RegionManager regionManager;
     private RegionBorderVisualizer regionVisualizer;
     private ItemClearTask itemClearTask;
@@ -46,6 +49,9 @@ public final class BetterCombatLogging extends JavaPlugin {
         protectionManager = new ProtectionManager(this);
         protectionManager.load();
 
+        itemLimitManager = new ItemLimitManager(this);
+        itemLimitManager.load();
+
         regionManager = new RegionManager(this);
         regionManager.load();
 
@@ -59,6 +65,8 @@ public final class BetterCombatLogging extends JavaPlugin {
         // Register listeners
         getServer().getPluginManager().registerEvents(new CombatListener(this, combatManager), this);
         getServer().getPluginManager().registerEvents(new ProtectionListener(this, protectionManager), this);
+        getServer().getPluginManager().registerEvents(new ItemLimitListener(this, itemLimitManager), this);
+        getServer().getPluginManager().registerEvents(new net.saturn.limiter.listener.VillagerTradeListener(this, itemLimitManager), this);
 
         // Only register RegionListener if WorldGuard is present
         if (worldGuardEnabled) {
@@ -89,6 +97,7 @@ public final class BetterCombatLogging extends JavaPlugin {
         // Register commands
         getCommand("combat").setExecutor(new CombatCommand(combatManager));
         getCommand("protectionlimit").setExecutor(new ProtectionLimitCommand(this, protectionManager));
+        getCommand("itemlimit").setExecutor(new net.saturn.limiter.command.ItemLimitCommand(this, itemLimitManager));
         getCommand("blockedregion").setExecutor(new BlockedRegionCommand(this, regionManager));
         getCommand("activatecombat").setExecutor(new CombatTestCommand(combatManager));
         getCommand("setcombatduration").setExecutor(new CombatDurationCommand(this));
@@ -116,6 +125,11 @@ public final class BetterCombatLogging extends JavaPlugin {
             protectionManager.save();
         }
 
+        // Save item limits
+        if (itemLimitManager != null) {
+            itemLimitManager.save();
+        }
+
         // Save blocked regions
         if (regionManager != null) {
             regionManager.save();
@@ -140,6 +154,10 @@ public final class BetterCombatLogging extends JavaPlugin {
 
     public ProtectionManager getProtectionManager() {
         return protectionManager;
+    }
+
+    public ItemLimitManager getItemLimitManager() {
+        return itemLimitManager;
     }
 
     public RegionManager getRegionManager() {
