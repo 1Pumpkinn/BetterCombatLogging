@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -25,224 +26,183 @@ public class ItemLimitListener implements Listener {
         this.itemLimitManager = itemLimitManager;
     }
 
+    /* ============================================================
+       ITEM PICKUP (GROUND → INVENTORY)
+       ============================================================ */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onItemPickup(EntityPickupItemEvent event) {
-        if (!(event.getEntity() instanceof Player)) {
-            return;
-        }
+        if (!(event.getEntity() instanceof Player player)) return;
 
-        Player player = (Player) event.getEntity();
-        ItemStack item = event.getItem().getItemStack();
-        Material material = item.getType();
+        ItemStack stack = event.getItem().getItemStack();
+        Material material = stack.getType();
 
-        if (!itemLimitManager.isItemLimited(material)) {
-            return;
-        }
+        if (!itemLimitManager.isItemLimited(material)) return;
 
-        Integer limit = itemLimitManager.getLimit(material);
+        int limit = itemLimitManager.getLimit(material);
 
-        // If completely banned (limit = 0)
+        // Fully banned
         if (limit == 0) {
             event.setCancelled(true);
-
-            String message = plugin.getConfig().getString(
-                    "messages.item-blocked-pickup-banned",
-                    "&cYou cannot pick up &e{item}&c - it is banned!"
-            ).replace("{item}", formatItemName(item));
-            player.sendMessage(colorize(message));
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                            "messages.item-blocked-pickup-banned",
+                            "&cYou cannot pick up &e{item}&c - it is banned!"
+                    ).replace("{item}", format(material))
+            ));
             return;
         }
 
-        // Check if picking up would exceed limit
-        int currentCount = itemLimitManager.countItemInInventory(player, material);
-        int pickupAmount = item.getAmount();
+        int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (currentCount >= limit) {
-            // Already at or over limit
+        // Would increase inventory beyond limit
+        if (current + stack.getAmount() > limit) {
             event.setCancelled(true);
-
-            String message = plugin.getConfig().getString(
-                            "messages.item-blocked-pickup-limit",
-                            "&cYou cannot pick up &e{item}&c - you already have the maximum ({limit})!"
-                    ).replace("{item}", formatItemName(item))
-                    .replace("{limit}", String.valueOf(limit));
-            player.sendMessage(colorize(message));
-        } else if (currentCount + pickupAmount > limit) {
-            // Pickup would exceed limit - allow partial pickup
-            int canPickup = limit - currentCount;
-
-            event.getItem().getItemStack().setAmount(pickupAmount - canPickup);
-
-            // Add only what they can carry
-            ItemStack toAdd = item.clone();
-            toAdd.setAmount(canPickup);
-            player.getInventory().addItem(toAdd);
-
-            event.setCancelled(true);
-
-            String message = plugin.getConfig().getString(
-                            "messages.item-partial-pickup",
-                            "&eYou can only pick up &6{amount} &e{item} (limit: {limit})"
-                    ).replace("{item}", formatItemName(item))
-                    .replace("{amount}", String.valueOf(canPickup))
-                    .replace("{limit}", String.valueOf(limit));
-            player.sendMessage(colorize(message));
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                                    "messages.item-blocked-pickup-limit",
+                                    "&cYou already have the maximum &e{item}&c ({limit})!"
+                            )
+                            .replace("{item}", format(material))
+                            .replace("{limit}", String.valueOf(limit))
+            ));
         }
-        // else: pickup is fine, let it proceed
     }
 
-    @EventHandler(priority = EventPriority.LOWEST) // Use LOWEST to catch it first
+    /* ============================================================
+       INVENTORY INTERACTIONS
+       ============================================================ */
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player)) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        // Ignore creative
+        if (event.getInventory().getType() == InventoryType.CREATIVE) return;
+
+        Inventory clicked = event.getClickedInventory();
+        if (clicked == null) return;
+
+        Inventory playerInv = player.getInventory();
+        InventoryAction action = event.getAction();
+
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+
+        /* ------------------------------------------------------------
+           ALWAYS ALLOW REMOVING ITEMS FROM CONTAINERS
+           ------------------------------------------------------------ */
+        if (clicked != playerInv) {
+            // Taking from chest/furnace/shulker/etc.
             return;
         }
 
-        Player player = (Player) event.getWhoClicked();
-
-        // Don't check creative inventory
-        if (event.getInventory().getType() == InventoryType.CREATIVE) {
+        /* ------------------------------------------------------------
+           DROPPING ITEMS (Q / CTRL+Q) → ALWAYS ALLOWED
+           ------------------------------------------------------------ */
+        if (action == InventoryAction.DROP_ALL_CURSOR ||
+                action == InventoryAction.DROP_ONE_CURSOR ||
+                action == InventoryAction.DROP_ALL_SLOT ||
+                action == InventoryAction.DROP_ONE_SLOT) {
             return;
         }
 
-        ItemStack clickedItem = event.getCurrentItem();
+        /* ------------------------------------------------------------
+           ONLY CHECK ACTIONS THAT ADD ITEMS TO PLAYER INVENTORY
+           ------------------------------------------------------------ */
+        boolean addsToInventory =
+                action == InventoryAction.PLACE_ALL ||
+                        action == InventoryAction.PLACE_ONE ||
+                        action == InventoryAction.PLACE_SOME ||
+                        action == InventoryAction.MOVE_TO_OTHER_INVENTORY;
 
-        // Only check if there's actually an item being clicked
-        if (clickedItem == null || clickedItem.getType() == Material.AIR) {
-            return;
-        }
+        if (!addsToInventory) return;
 
-        Material material = clickedItem.getType();
+        ItemStack adding =
+                action == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                        ? current
+                        : cursor;
 
-        if (!itemLimitManager.isItemLimited(material)) {
-            return;
-        }
+        if (adding == null || adding.getType() == Material.AIR) return;
 
-        Inventory clickedInventory = event.getClickedInventory();
+        Material material = adding.getType();
 
-        // If clicked inventory is null, ignore
-        if (clickedInventory == null) {
-            return;
-        }
+        if (!itemLimitManager.isItemLimited(material)) return;
 
-        // Check if player is taking item FROM a non-player inventory (chest, etc.)
-        // This means they're trying to move it INTO their inventory
-        boolean takingFromContainer = !clickedInventory.equals(player.getInventory());
+        int limit = itemLimitManager.getLimit(material);
 
-        if (!takingFromContainer) {
-            // Player is clicking in their own inventory - allow (they might be dropping/moving around)
-            return;
-        }
-
-        // At this point, player is trying to take a limited item from a container
-        Integer limit = itemLimitManager.getLimit(material);
-
-        // If completely banned
+        // Banned everywhere
         if (limit == 0) {
             event.setCancelled(true);
-
-            String message = plugin.getConfig().getString(
-                    "messages.item-blocked-take",
-                    "&cYou cannot take &e{item}&c - it is banned!"
-            ).replace("{item}", formatItemName(clickedItem));
-            player.sendMessage(colorize(message));
+            player.updateInventory();
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                            "messages.item-blocked-place-banned",
+                            "&cYou cannot use &e{item}&c - it is banned!"
+                    ).replace("{item}", format(material))
+            ));
             return;
         }
 
-        // Check current count
         int currentCount = itemLimitManager.countItemInInventory(player, material);
-        int itemAmount = clickedItem.getAmount();
 
-        // Already at limit
+        // At or above limit → block ADDING, but NOT removing
         if (currentCount >= limit) {
             event.setCancelled(true);
-
-            String message = plugin.getConfig().getString(
-                            "messages.item-blocked-take-limit",
-                            "&cYou cannot take &e{item}&c - you already have the maximum ({limit})!"
-                    ).replace("{item}", formatItemName(clickedItem))
-                    .replace("{limit}", String.valueOf(limit));
-            player.sendMessage(colorize(message));
-            return;
+            player.updateInventory();
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                                    "messages.item-blocked-place-limit",
+                                    "&cYou already have the maximum &e{item}&c ({limit})!"
+                            )
+                            .replace("{item}", format(material))
+                            .replace("{limit}", String.valueOf(limit))
+            ));
         }
-
-        // Would exceed limit
-        if (currentCount + itemAmount > limit) {
-            event.setCancelled(true);
-
-            int canTake = limit - currentCount;
-            String message = plugin.getConfig().getString(
-                            "messages.item-blocked-take-partial",
-                            "&cYou can only take &6{amount} &cmore &e{item}&c (limit: {limit})"
-                    ).replace("{item}", formatItemName(clickedItem))
-                    .replace("{amount}", String.valueOf(canTake))
-                    .replace("{limit}", String.valueOf(limit));
-            player.sendMessage(colorize(message));
-            return;
-        }
-
-        // Within limit - allow the action
     }
 
+    /* ============================================================
+       LOGIN ENFORCEMENT (ONLY PLACE WE REMOVE ITEMS)
+       ============================================================ */
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Check and enforce limits after join
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (player.isOnline()) {
-                    enforceAllLimits(player);
+                if (!player.isOnline()) return;
+
+                int removed = 0;
+                for (Material mat : itemLimitManager.getLimitedItems().keySet()) {
+                    removed += itemLimitManager.enforceLimit(player, mat);
+                }
+
+                if (removed > 0) {
+                    player.sendMessage(colorize(
+                            plugin.getConfig().getString(
+                                    "messages.items-removed-login",
+                                    "&cRemoved &e{count} &climited items from your inventory!"
+                            ).replace("{count}", String.valueOf(removed))
+                    ));
                 }
             }
-        }.runTaskLater(plugin, 20L); // 1 second delay
+        }.runTaskLater(plugin, 20L);
     }
 
-    /**
-     * Enforces all item limits for a player (only on login)
-     */
-    private void enforceAllLimits(Player player) {
-        if (!itemLimitManager.hasLimitedItems()) {
-            return;
+    /* ============================================================
+       UTIL
+       ============================================================ */
+    private String format(Material material) {
+        String[] parts = material.name().toLowerCase().split("_");
+        StringBuilder out = new StringBuilder();
+        for (String p : parts) {
+            out.append(Character.toUpperCase(p.charAt(0)))
+                    .append(p.substring(1))
+                    .append(" ");
         }
-
-        int totalRemoved = 0;
-
-        for (Material material : itemLimitManager.getLimitedItems().keySet()) {
-            int removed = itemLimitManager.enforceLimit(player, material);
-            totalRemoved += removed;
-        }
-
-        if (totalRemoved > 0) {
-            String message = plugin.getConfig().getString(
-                    "messages.items-removed-login",
-                    "&cRemoved &e{count} &climited items from your inventory!"
-            ).replace("{count}", String.valueOf(totalRemoved));
-            player.sendMessage(colorize(message));
-        }
+        return out.toString().trim();
     }
 
-    private String formatItemName(ItemStack item) {
-        return formatMaterialName(item.getType());
-    }
-
-    private String formatMaterialName(Material material) {
-        String name = material.name().replace("_", " ");
-        String[] words = name.split(" ");
-        StringBuilder formatted = new StringBuilder();
-
-        for (String word : words) {
-            if (formatted.length() > 0) {
-                formatted.append(" ");
-            }
-            formatted.append(word.substring(0, 1).toUpperCase())
-                    .append(word.substring(1).toLowerCase());
-        }
-
-        return formatted.toString();
-    }
-
-    private String colorize(String message) {
-        return net.md_5.bungee.api.ChatColor.translateAlternateColorCodes('&', message);
+    private String colorize(String msg) {
+        return net.md_5.bungee.api.ChatColor.translateAlternateColorCodes('&', msg);
     }
 }
