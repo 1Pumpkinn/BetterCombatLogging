@@ -3,7 +3,6 @@ package net.saturn.limiter.listener;
 import net.saturn.BetterCombatLogging;
 import net.saturn.limiter.manager.ItemLimitManager;
 import org.bukkit.Material;
-import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -44,23 +43,45 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current + stack.getAmount() > limit) {
+        // If banned or would exceed limit, cancel pickup
+        if (limit == 0) {
             event.setCancelled(true);
             player.sendMessage(colorize(
                     plugin.getConfig().getString(
-                                    "messages.item-blocked-pickup",
-                                    "&cYou cannot pick up &e{item}&c (limit: {limit})"
+                                    "messages.item-blocked-pickup-banned",
+                                    "&cYou cannot pick up &e{item}&c - it is banned!"
                             )
                             .replace("{item}", format(material))
+            ));
+        } else if (current >= limit) {
+            event.setCancelled(true);
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                                    "messages.item-blocked-pickup-limit",
+                                    "&cYou cannot pick up &e{item}&c - you are at the maximum ({limit})!"
+                            )
+                            .replace("{item}", format(material))
+                            .replace("{limit}", String.valueOf(limit))
+            ));
+        } else if (current + stack.getAmount() > limit) {
+            event.setCancelled(true);
+            int canPickup = limit - current;
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                                    "messages.item-partial-pickup",
+                                    "&cYou can only pick up &6{amount} &cmore &e{item}&c (limit: {limit})"
+                            )
+                            .replace("{item}", format(material))
+                            .replace("{amount}", String.valueOf(canPickup))
                             .replace("{limit}", String.valueOf(limit))
             ));
         }
     }
 
     /* ============================================================
-       INVENTORY CLICK
+       INVENTORY CLICK - HANDLE ALL CASES INCLUDING SHIFT-CLICK
        ============================================================ */
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getInventory().getType() == InventoryType.CREATIVE) return;
@@ -71,51 +92,160 @@ public class ItemLimitListener implements Listener {
         Inventory playerInv = player.getInventory();
         InventoryAction action = event.getAction();
 
-        // Always allow removing items from containers
-        if (clicked != playerInv) return;
+        // Special handling for hotbar swaps (number keys)
+        if (action == InventoryAction.HOTBAR_SWAP || action == InventoryAction.HOTBAR_MOVE_AND_READD) {
+            int hotbarButton = event.getHotbarButton();
+            if (hotbarButton >= 0 && hotbarButton < 9) {
+                ItemStack hotbarItem = player.getInventory().getItem(hotbarButton);
+                ItemStack clickedItem = event.getCurrentItem();
 
-        // Always allow dropping
-        if (action.name().startsWith("DROP")) return;
+                // Check if we're swapping FROM a container TO player hotbar
+                if (clicked != playerInv && clickedItem != null && clickedItem.getType() != Material.AIR) {
+                    Material material = clickedItem.getType();
 
-        boolean adds =
-                action == InventoryAction.PLACE_ALL ||
-                        action == InventoryAction.PLACE_ONE ||
-                        action == InventoryAction.PLACE_SOME ||
-                        action == InventoryAction.MOVE_TO_OTHER_INVENTORY;
+                    if (itemLimitManager.isItemLimited(material)) {
+                        int limit = itemLimitManager.getLimit(material);
+                        int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (!adds) return;
+                        // If banned
+                        if (limit == 0) {
+                            event.setCancelled(true);
+                            player.updateInventory();
+                            player.sendMessage(colorize(
+                                    plugin.getConfig().getString(
+                                                    "messages.item-blocked-place-banned",
+                                                    "&cYou cannot have &e{item}&c - it is banned!"
+                                            )
+                                            .replace("{item}", format(material))
+                            ));
+                            return;
+                        }
 
-        ItemStack adding =
-                action == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                        ? event.getCurrentItem()
-                        : event.getCursor();
+                        // If at or over limit, cancel
+                        if (current >= limit) {
+                            event.setCancelled(true);
+                            player.updateInventory();
+                            player.sendMessage(colorize(
+                                    plugin.getConfig().getString(
+                                                    "messages.item-blocked-place-limit",
+                                                    "&cYou already have the maximum &e{item}&c ({limit})!"
+                                            )
+                                            .replace("{item}", format(material))
+                                            .replace("{limit}", String.valueOf(limit))
+                            ));
+                            return;
+                        }
+                    }
+                }
+            }
+            return;
+        }
 
-        if (adding == null || adding.getType() == Material.AIR) return;
+        // Get the item being moved
+        ItemStack movingItem = null;
+        Material material = null;
 
-        Material material = adding.getType();
+        // Determine what item is being moved and where
+        switch (action) {
+            case PLACE_ALL:
+            case PLACE_ONE:
+            case PLACE_SOME:
+                // Taking item from cursor and placing in inventory
+                movingItem = event.getCursor();
+                break;
+
+            case MOVE_TO_OTHER_INVENTORY:
+                // Shift-clicking to move items
+                movingItem = event.getCurrentItem();
+                break;
+
+            case SWAP_WITH_CURSOR:
+                // Swapping cursor item with clicked item
+                movingItem = event.getCursor();
+                break;
+
+            case COLLECT_TO_CURSOR:
+                // Double-clicking to collect items
+                movingItem = event.getCursor();
+                break;
+
+            default:
+                // Allow all other actions (PICKUP, DROP, etc.)
+                return;
+        }
+
+        if (movingItem == null || movingItem.getType() == Material.AIR) return;
+        material = movingItem.getType();
+
         if (!itemLimitManager.isItemLimited(material)) return;
 
         int limit = itemLimitManager.getLimit(material);
-        int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current >= limit) {
-            event.setCancelled(true);
-            player.updateInventory();
-            player.sendMessage(colorize(
-                    plugin.getConfig().getString(
-                                    "messages.item-blocked-place-limit",
-                                    "&cYou already have the maximum &e{item}&c ({limit})!"
-                            )
-                            .replace("{item}", format(material))
-                            .replace("{limit}", String.valueOf(limit))
-            ));
+        // If item is banned, always cancel
+        if (limit == 0) {
+            // Only cancel if trying to add to player inventory
+            if (isAddingToPlayerInventory(action, clicked, playerInv)) {
+                event.setCancelled(true);
+                player.updateInventory();
+                player.sendMessage(colorize(
+                        plugin.getConfig().getString(
+                                        "messages.item-blocked-place-banned",
+                                        "&cYou cannot have &e{item}&c - it is banned!"
+                                )
+                                .replace("{item}", format(material))
+                ));
+            }
+            return;
+        }
+
+        // Check if this action would add items to player inventory
+        if (isAddingToPlayerInventory(action, clicked, playerInv)) {
+            int current = itemLimitManager.countItemInInventory(player, material);
+
+            // If already at or over limit, cancel
+            if (current >= limit) {
+                event.setCancelled(true);
+                player.updateInventory();
+                player.sendMessage(colorize(
+                        plugin.getConfig().getString(
+                                        "messages.item-blocked-place-limit",
+                                        "&cYou already have the maximum &e{item}&c ({limit})!"
+                                )
+                                .replace("{item}", format(material))
+                                .replace("{limit}", String.valueOf(limit))
+                ));
+            }
+        }
+    }
+
+    /**
+     * Determines if an inventory action is adding items to the player's inventory
+     */
+    private boolean isAddingToPlayerInventory(InventoryAction action, Inventory clicked, Inventory playerInv) {
+        switch (action) {
+            case PLACE_ALL:
+            case PLACE_ONE:
+            case PLACE_SOME:
+            case SWAP_WITH_CURSOR:
+            case HOTBAR_SWAP:
+            case HOTBAR_MOVE_AND_READD:
+            case COLLECT_TO_CURSOR:
+                // These add to player inventory if clicking in player inventory
+                return clicked == playerInv;
+
+            case MOVE_TO_OTHER_INVENTORY:
+                // Shift-click adds to player inventory if clicking in a container
+                return clicked != playerInv;
+
+            default:
+                return false;
         }
     }
 
     /* ============================================================
        ESC / INVENTORY CLOSE FIX
        ============================================================ */
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
 
@@ -128,9 +258,29 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
+        // If banned or would exceed limit, drop the cursor item
         if (limit == 0 || current + cursor.getAmount() > limit) {
             player.setItemOnCursor(null);
             player.getWorld().dropItemNaturally(player.getLocation(), cursor);
+
+            if (limit == 0) {
+                player.sendMessage(colorize(
+                        plugin.getConfig().getString(
+                                        "messages.item-blocked-place-banned",
+                                        "&cYou cannot have &e{item}&c - it is banned!"
+                                )
+                                .replace("{item}", format(material))
+                ));
+            } else {
+                player.sendMessage(colorize(
+                        plugin.getConfig().getString(
+                                        "messages.item-blocked-place-limit",
+                                        "&cYou already have the maximum &e{item}&c ({limit})!"
+                                )
+                                .replace("{item}", format(material))
+                                .replace("{limit}", String.valueOf(limit))
+                ));
+            }
         }
     }
 
@@ -150,6 +300,7 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
+        // If banned or would exceed limit, drop the cursor item
         if (limit == 0 || current + cursor.getAmount() > limit) {
             player.setItemOnCursor(null);
             player.getWorld().dropItemNaturally(player.getLocation(), cursor);
