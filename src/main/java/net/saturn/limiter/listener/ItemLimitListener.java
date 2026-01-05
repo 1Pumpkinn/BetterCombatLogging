@@ -40,7 +40,15 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current + stack.getAmount() > limit) {
+        // If banned, cancel pickup
+        if (limit == 0) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        // If at or over limit, cancel pickup
+        if (current >= limit) {
             event.setCancelled(true);
             sendBlockedMessage(player, material, limit);
         }
@@ -61,7 +69,6 @@ public class ItemLimitListener implements Listener {
         InventoryAction action = event.getAction();
 
         ItemStack moving;
-
         boolean fromContainer = clicked != playerInv;
 
         switch (action) {
@@ -92,11 +99,20 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current + moving.getAmount() > limit) {
+        // If banned, always cancel
+        if (limit == 0) {
+            event.setCancelled(true);
+            player.updateInventory();
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        // If at or over limit, cancel the action
+        if (current >= limit) {
             event.setCancelled(true);
             player.updateInventory();
 
-            // Only drop if NOT from a container
+            // If from cursor (not container), drop it
             if (!fromContainer) {
                 dropCursorSafe(player);
             }
@@ -121,7 +137,8 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current + cursor.getAmount() > limit) {
+        // If banned or at/over limit, drop the item
+        if (limit == 0 || current >= limit) {
             dropCursorSafe(player);
             sendBlockedMessage(player, material, limit);
         }
@@ -143,7 +160,8 @@ public class ItemLimitListener implements Listener {
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        if (limit == 0 || current + cursor.getAmount() > limit) {
+        // If banned or at/over limit, allow drop but clear cursor
+        if (limit == 0 || current >= limit) {
             event.setCancelled(true);
             dropCursorSafe(player);
             sendBlockedMessage(player, material, limit);
@@ -162,17 +180,17 @@ public class ItemLimitListener implements Listener {
             public void run() {
                 if (!player.isOnline()) return;
 
-                int removed = 0;
+                int dropped = 0;
                 for (Material mat : itemLimitManager.getLimitedItems().keySet()) {
-                    removed += itemLimitManager.enforceLimit(player, mat);
+                    dropped += itemLimitManager.dropExcess(player, mat);
                 }
 
-                if (removed > 0) {
+                if (dropped > 0) {
                     player.sendMessage(colorize(
                             plugin.getConfig().getString(
-                                    "messages.items-removed-login",
-                                    "&cRemoved &e{count} &climited items!"
-                            ).replace("{count}", String.valueOf(removed))
+                                    "messages.items-dropped-login",
+                                    "&eDropped &6{count} &elimited items at your feet!"
+                            ).replace("{count}", String.valueOf(dropped))
                     ));
                 }
             }

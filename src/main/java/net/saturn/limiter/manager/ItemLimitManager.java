@@ -170,10 +170,10 @@ public class ItemLimitManager {
     }
 
     /**
-     * Removes excess items from player's inventory to enforce limits
-     * Returns the number of items removed
+     * Drops excess items from player's inventory to enforce limits
+     * Returns the number of items dropped
      */
-    public int enforceLimit(org.bukkit.entity.Player player, Material material) {
+    public int dropExcess(org.bukkit.entity.Player player, Material material) {
         Integer limit = limitedItems.get(material);
         if (limit == null) {
             return 0;
@@ -185,57 +185,71 @@ public class ItemLimitManager {
             return 0; // Within limit
         }
 
-        int toRemove = currentCount - limit;
-        int removed = 0;
+        int toDrop = currentCount - limit;
+        int dropped = 0;
 
-        // Remove from main inventory
-        for (int i = 0; i < player.getInventory().getSize() && removed < toRemove; i++) {
+        // Drop from main inventory
+        for (int i = 0; i < player.getInventory().getSize() && dropped < toDrop; i++) {
             ItemStack item = player.getInventory().getItem(i);
             if (item != null && item.getType() == material) {
                 int amount = item.getAmount();
-                if (amount <= toRemove - removed) {
+                if (amount <= toDrop - dropped) {
                     player.getInventory().setItem(i, null);
-                    removed += amount;
+                    player.getWorld().dropItemNaturally(player.getLocation(), item);
+                    dropped += amount;
                 } else {
-                    item.setAmount(amount - (toRemove - removed));
-                    removed = toRemove;
+                    int amountToDrop = toDrop - dropped;
+                    ItemStack dropStack = item.clone();
+                    dropStack.setAmount(amountToDrop);
+                    item.setAmount(amount - amountToDrop);
+                    player.getWorld().dropItemNaturally(player.getLocation(), dropStack);
+                    dropped = toDrop;
                 }
             }
         }
 
-        // Remove from armor slots if needed
-        if (removed < toRemove) {
+        // Drop from armor slots if needed
+        if (dropped < toDrop) {
             ItemStack[] armor = player.getInventory().getArmorContents();
-            for (int i = 0; i < armor.length && removed < toRemove; i++) {
+            for (int i = 0; i < armor.length && dropped < toDrop; i++) {
                 if (armor[i] != null && armor[i].getType() == material) {
                     int amount = armor[i].getAmount();
-                    if (amount <= toRemove - removed) {
+                    if (amount <= toDrop - dropped) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), armor[i]);
                         armor[i] = null;
-                        removed += amount;
+                        dropped += amount;
                     } else {
-                        armor[i].setAmount(amount - (toRemove - removed));
-                        removed = toRemove;
+                        int amountToDrop = toDrop - dropped;
+                        ItemStack dropStack = armor[i].clone();
+                        dropStack.setAmount(amountToDrop);
+                        armor[i].setAmount(amount - amountToDrop);
+                        player.getWorld().dropItemNaturally(player.getLocation(), dropStack);
+                        dropped = toDrop;
                     }
                 }
             }
             player.getInventory().setArmorContents(armor);
         }
 
-        // Remove from off-hand if needed
-        if (removed < toRemove) {
+        // Drop from off-hand if needed
+        if (dropped < toDrop) {
             ItemStack offHand = player.getInventory().getItemInOffHand();
             if (offHand != null && offHand.getType() == material) {
                 int amount = offHand.getAmount();
-                if (amount <= toRemove - removed) {
+                if (amount <= toDrop - dropped) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), offHand);
                     player.getInventory().setItemInOffHand(null);
-                    removed += amount;
+                    dropped += amount;
                 } else {
-                    offHand.setAmount(amount - (toRemove - removed));
-                    removed = toRemove;
+                    int amountToDrop = toDrop - dropped;
+                    ItemStack dropStack = offHand.clone();
+                    dropStack.setAmount(amountToDrop);
+                    offHand.setAmount(amount - amountToDrop);
+                    player.getWorld().dropItemNaturally(player.getLocation(), dropStack);
+                    dropped = toDrop;
                 }
             }
         }
-
-        return removed;
+        return dropped;
     }
 }

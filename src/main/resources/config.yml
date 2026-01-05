@@ -90,6 +90,6 @@ messages:
   item-blocked-trade-banned: "&cCannot trade for &e{item}&c - it's banned!"
   item-blocked-trade-limit: "&cCannot trade for &e{item}&c - at max ({limit})!"
   item-blocked-trade-partial: "&cTrade exceeds limit! Can have &6{remaining} &cmore &e{item} &7(max: {limit})"
-  items-removed-login: "&cRemoved &e{count} &climited items!"
+  items-dropped-login: "&eDropped &6{count} &elimited items at your feet!"
   item-excess-removed: "&cRemoved &e{amount} {item}&c - over limit of {limit}!"
   item-excess-dropped: "&cDropped &e{amount} {item}&c - over limit!"
