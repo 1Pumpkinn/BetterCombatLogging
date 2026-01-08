@@ -68,7 +68,7 @@ public class ItemLimitListener implements Listener {
         Inventory playerInv = player.getInventory();
         InventoryAction action = event.getAction();
 
-        ItemStack moving;
+        ItemStack moving = null;
         boolean fromContainer = clicked != playerInv;
 
         switch (action) {
@@ -118,6 +118,152 @@ public class ItemLimitListener implements Listener {
             }
 
             sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        // Check if adding would exceed limit
+        int amountToAdd = moving.getAmount();
+        if (current + amountToAdd > limit) {
+            event.setCancelled(true);
+            player.updateInventory();
+
+            // Calculate how much can be added
+            int canAdd = limit - current;
+
+            if (fromContainer) {
+                // From container - add what we can, leave rest in container
+                handlePartialTransferFromContainer(player, event, material, canAdd);
+            } else {
+                // From cursor - add what we can, drop the rest
+                handlePartialTransferFromCursor(player, moving, material, canAdd);
+            }
+
+            return;
+        }
+    }
+
+    /* ============================================================
+       DRAG EVENT - CRITICAL FOR CHEST/SHULKER DRAGGING
+       ============================================================ */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        ItemStack draggedItem = event.getOldCursor();
+        if (draggedItem == null || draggedItem.getType() == Material.AIR) return;
+
+        Material material = draggedItem.getType();
+        if (!itemLimitManager.isItemLimited(material)) return;
+
+        int limit = itemLimitManager.getLimit(material);
+
+        // If banned, always cancel
+        if (limit == 0) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        Inventory playerInv = player.getInventory();
+        int current = itemLimitManager.countItemInInventory(player, material);
+
+        // Check if any dragged slot is in player inventory
+        boolean draggingToPlayerInv = false;
+        for (int slot : event.getRawSlots()) {
+            if (slot < playerInv.getSize()) {
+                draggingToPlayerInv = true;
+                break;
+            }
+        }
+
+        if (!draggingToPlayerInv) return;
+
+        // Calculate total amount being dragged
+        int totalDragAmount = 0;
+        for (ItemStack stack : event.getNewItems().values()) {
+            if (stack != null && stack.getType() == material) {
+                totalDragAmount += stack.getAmount();
+            }
+        }
+
+        // If at or over limit, cancel
+        if (current >= limit) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        // If dragging would exceed limit, cancel
+        if (current + totalDragAmount > limit) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+        }
+    }
+
+    /* ============================================================
+       SHIFT CLICK - HANDLES MASS TRANSFER
+       ============================================================ */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onShiftClick(InventoryClickEvent event) {
+        if (event.getClick() != ClickType.SHIFT_LEFT && event.getClick() != ClickType.SHIFT_RIGHT) return;
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType() == Material.AIR) return;
+
+        Material material = clicked.getType();
+        if (!itemLimitManager.isItemLimited(material)) return;
+
+        Inventory clickedInv = event.getClickedInventory();
+        Inventory playerInv = player.getInventory();
+
+        // Only handle shift-clicking FROM a container TO player inventory
+        if (clickedInv == playerInv) return;
+
+        int limit = itemLimitManager.getLimit(material);
+
+        // If banned, cancel
+        if (limit == 0) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        int current = itemLimitManager.countItemInInventory(player, material);
+
+        // If at limit, cancel
+        if (current >= limit) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        int amountToTransfer = clicked.getAmount();
+
+        // If transfer would exceed limit, handle partial transfer
+        if (current + amountToTransfer > limit) {
+            event.setCancelled(true);
+
+            int canTransfer = limit - current;
+
+            // Schedule the partial transfer for next tick
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!player.isOnline()) return;
+
+                    // Remove from source
+                    clicked.setAmount(clicked.getAmount() - canTransfer);
+
+                    // Add to player inventory
+                    ItemStack toAdd = clicked.clone();
+                    toAdd.setAmount(canTransfer);
+                    playerInv.addItem(toAdd);
+
+                    player.updateInventory();
+                    sendPartialMessage(player, material, canTransfer, limit);
+                }
+            }.runTask(plugin);
         }
     }
 
@@ -207,6 +353,55 @@ public class ItemLimitListener implements Listener {
         return clicked == playerInv;
     }
 
+    private void handlePartialTransferFromContainer(Player player, InventoryClickEvent event, Material material, int canAdd) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) return;
+
+                ItemStack source = event.getCurrentItem();
+                if (source == null) return;
+
+                // Take what we can from the source
+                int remaining = source.getAmount() - canAdd;
+                source.setAmount(remaining);
+
+                // Add to player inventory
+                ItemStack toAdd = source.clone();
+                toAdd.setAmount(canAdd);
+                player.getInventory().addItem(toAdd);
+
+                player.updateInventory();
+                sendPartialMessage(player, material, canAdd, itemLimitManager.getLimit(material));
+            }
+        }.runTask(plugin);
+    }
+
+    private void handlePartialTransferFromCursor(Player player, ItemStack cursor, Material material, int canAdd) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) return;
+
+                // Add what we can to inventory
+                ItemStack toAdd = cursor.clone();
+                toAdd.setAmount(canAdd);
+                player.getInventory().addItem(toAdd);
+
+                // Drop the rest
+                ItemStack toDrop = cursor.clone();
+                toDrop.setAmount(cursor.getAmount() - canAdd);
+                player.getWorld().dropItemNaturally(player.getLocation(), toDrop);
+
+                // Clear cursor
+                player.setItemOnCursor(null);
+                player.updateInventory();
+
+                sendPartialMessage(player, material, canAdd, itemLimitManager.getLimit(material));
+            }
+        }.runTask(plugin);
+    }
+
     private void dropCursorSafe(Player player) {
         ItemStack cursor = player.getItemOnCursor();
         if (cursor == null || cursor.getType() == Material.AIR) return;
@@ -231,6 +426,18 @@ public class ItemLimitListener implements Listener {
                                 "&cYou cannot have &e{item}&c!"
                         )
                         .replace("{item}", format(material))
+                        .replace("{limit}", String.valueOf(limit))
+        ));
+    }
+
+    private void sendPartialMessage(Player player, Material material, int added, int limit) {
+        player.sendMessage(colorize(
+                plugin.getConfig().getString(
+                                "messages.item-partial-pickup",
+                                "&eAdded &6{amount} &e{item} &7(max: {limit})"
+                        )
+                        .replace("{item}", format(material))
+                        .replace("{amount}", String.valueOf(added))
                         .replace("{limit}", String.valueOf(limit))
         ));
     }
