@@ -20,10 +20,46 @@ public class ItemLimitListener implements Listener {
 
     private final BetterCombatLogging plugin;
     private final ItemLimitManager itemLimitManager;
+    private BukkitRunnable periodicCheckTask;
 
     public ItemLimitListener(BetterCombatLogging plugin, ItemLimitManager itemLimitManager) {
         this.plugin = plugin;
         this.itemLimitManager = itemLimitManager;
+        startPeriodicCheck();
+    }
+
+    /**
+     * Starts a periodic task that checks all online players for excess items
+     * This catches items added via /give or other means that might bypass normal events
+     */
+    private void startPeriodicCheck() {
+        // Run every 5 seconds (100 ticks) to check all players for excess items
+        periodicCheckTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!plugin.isEnabled()) {
+                    cancel();
+                    return;
+                }
+
+                // Check all online players for excess items
+                for (Player player : plugin.getServer().getOnlinePlayers()) {
+                    if (player != null && player.isOnline()) {
+                        checkAndDropAllExcess(player);
+                    }
+                }
+            }
+        };
+        periodicCheckTask.runTaskTimer(plugin, 100L, 100L); // Start after 5 seconds, then every 5 seconds
+    }
+
+    /**
+     * Stops the periodic check task (useful for cleanup)
+     */
+    public void stopPeriodicCheck() {
+        if (periodicCheckTask != null && !periodicCheckTask.isCancelled()) {
+            periodicCheckTask.cancel();
+        }
     }
 
     /* ============================================================
@@ -51,7 +87,14 @@ public class ItemLimitListener implements Listener {
         int amountPickingUp = stack.getAmount();
         int totalAfterPickup = current + amountPickingUp;
 
-        // Allow pickup only if total after pickup is within limit
+        // If already at or over limit, cancel the pickup
+        if (current >= limit) {
+            event.setCancelled(true);
+            sendBlockedMessage(player, material, limit);
+            return;
+        }
+
+        // If picking up would exceed limit, cancel the pickup
         if (totalAfterPickup > limit) {
             event.setCancelled(true);
             sendBlockedMessage(player, material, limit);
@@ -374,10 +417,31 @@ public class ItemLimitListener implements Listener {
         if (!(event.getPlayer() instanceof Player player)) return;
 
         ItemStack cursor = player.getItemOnCursor();
-        if (cursor == null || cursor.getType() == Material.AIR) return;
+        if (cursor == null || cursor.getType() == Material.AIR) {
+            // No item on cursor, but check for excess items in inventory
+            // This catches items added via /give or other means
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!player.isOnline()) return;
+                    checkAndDropAllExcess(player);
+                }
+            }.runTask(plugin);
+            return;
+        }
 
         Material material = cursor.getType();
-        if (!itemLimitManager.isItemLimited(material)) return;
+        if (!itemLimitManager.isItemLimited(material)) {
+            // Check for other excess items even if cursor item isn't limited
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!player.isOnline()) return;
+                    checkAndDropAllExcess(player);
+                }
+            }.runTask(plugin);
+            return;
+        }
 
         int limit = itemLimitManager.getLimit(material);
         int current = itemLimitManager.countItemInInventory(player, material);
@@ -387,6 +451,15 @@ public class ItemLimitListener implements Listener {
             dropCursorSafe(player);
             sendBlockedMessage(player, material, limit);
         }
+
+        // Also check for excess items in inventory after handling cursor
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) return;
+                checkAndDropAllExcess(player);
+            }
+        }.runTask(plugin);
     }
 
     /* ============================================================
@@ -514,6 +587,50 @@ public class ItemLimitListener implements Listener {
                 player.getWorld().dropItemNaturally(player.getLocation(), drop);
             }
         }.runTask(plugin);
+    }
+
+    /**
+     * Checks and drops excess items for a specific material
+     * Sends a message to the player if items were dropped
+     */
+    private void checkAndDropExcess(Player player, Material material) {
+        if (!itemLimitManager.isItemLimited(material)) return;
+
+        int dropped = itemLimitManager.dropExcess(player, material);
+        if (dropped > 0) {
+            int limit = itemLimitManager.getLimit(material);
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                            "messages.items-dropped-excess",
+                            "&eDropped &6{amount} &e{item} &7(limit: {limit})"
+                    )
+                            .replace("{amount}", String.valueOf(dropped))
+                            .replace("{item}", format(material))
+                            .replace("{limit}", String.valueOf(limit))
+            ));
+            player.updateInventory();
+        }
+    }
+
+    /**
+     * Checks and drops excess items for all limited materials in player's inventory
+     * This is useful for catching items added via /give or other means
+     */
+    private void checkAndDropAllExcess(Player player) {
+        int totalDropped = 0;
+        for (Material material : itemLimitManager.getLimitedItems().keySet()) {
+            totalDropped += itemLimitManager.dropExcess(player, material);
+        }
+
+        if (totalDropped > 0) {
+            player.sendMessage(colorize(
+                    plugin.getConfig().getString(
+                            "messages.items-dropped-excess-all",
+                            "&eDropped &6{count} &eexcess limited items at your feet!"
+                    ).replace("{count}", String.valueOf(totalDropped))
+            ));
+            player.updateInventory();
+        }
     }
 
     private void sendBlockedMessage(Player player, Material material, int limit) {
