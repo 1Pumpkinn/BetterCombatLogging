@@ -11,6 +11,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -38,7 +39,6 @@ public class ItemLimitListener implements Listener {
         if (!itemLimitManager.isItemLimited(material)) return;
 
         int limit = itemLimitManager.getLimit(material);
-        int current = itemLimitManager.countItemInInventory(player, material);
 
         // If banned, cancel pickup
         if (limit == 0) {
@@ -47,10 +47,54 @@ public class ItemLimitListener implements Listener {
             return;
         }
 
-        // If at or over limit, cancel pickup
-        if (current >= limit) {
+        int current = itemLimitManager.countItemInInventory(player, material);
+        int amountPickingUp = stack.getAmount();
+        int totalAfterPickup = current + amountPickingUp;
+
+        // Allow pickup only if total after pickup is within limit
+        if (totalAfterPickup > limit) {
             event.setCancelled(true);
             sendBlockedMessage(player, material, limit);
+        }
+        // If totalAfterPickup <= limit, allow the pickup (don't cancel event)
+    }
+
+    /* ============================================================
+       HAND SWAP (F KEY)
+       ============================================================ */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHandSwap(PlayerSwapHandItemsEvent event) {
+        Player player = event.getPlayer();
+        ItemStack offHandItem = event.getOffHandItem();
+        ItemStack mainHandItem = event.getMainHandItem();
+
+        // Check both items being swapped
+        Material offHandMat = offHandItem != null ? offHandItem.getType() : Material.AIR;
+        Material mainHandMat = mainHandItem != null ? mainHandItem.getType() : Material.AIR;
+
+        // Only check limited items
+        boolean offHandLimited = offHandMat != Material.AIR && itemLimitManager.isItemLimited(offHandMat);
+        boolean mainHandLimited = mainHandMat != Material.AIR && itemLimitManager.isItemLimited(mainHandMat);
+
+        if (!offHandLimited && !mainHandLimited) return;
+
+        // For hand swaps, we don't need to cancel as the total count stays the same
+        // Just verify neither item is banned
+        if (offHandLimited) {
+            int limit = itemLimitManager.getLimit(offHandMat);
+            if (limit == 0) {
+                event.setCancelled(true);
+                sendBlockedMessage(player, offHandMat, limit);
+                return;
+            }
+        }
+
+        if (mainHandLimited) {
+            int limit = itemLimitManager.getLimit(mainHandMat);
+            if (limit == 0) {
+                event.setCancelled(true);
+                sendBlockedMessage(player, mainHandMat, limit);
+            }
         }
     }
 
@@ -67,9 +111,13 @@ public class ItemLimitListener implements Listener {
 
         Inventory playerInv = player.getInventory();
         InventoryAction action = event.getAction();
+        int slot = event.getSlot();
 
         ItemStack moving = null;
         boolean fromContainer = clicked != playerInv;
+
+        // Check if clicking offhand slot (slot 40 in player inventory)
+        boolean isOffhandSlot = (clicked == playerInv && slot == 40);
 
         switch (action) {
             case PLACE_ALL:
@@ -85,6 +133,21 @@ public class ItemLimitListener implements Listener {
                 moving = event.getCurrentItem();
                 break;
 
+            case HOTBAR_SWAP:
+            case HOTBAR_MOVE_AND_READD:
+                // Handle hotbar swaps to/from offhand
+                if (isOffhandSlot) {
+                    int hotbarButton = event.getHotbarButton();
+                    if (hotbarButton >= 0 && hotbarButton < 9) {
+                        ItemStack hotbarItem = playerInv.getItem(hotbarButton);
+                        if (hotbarItem != null && hotbarItem.getType() != Material.AIR) {
+                            moving = hotbarItem;
+                            fromContainer = false;
+                        }
+                    }
+                }
+                break;
+
             default:
                 return;
         }
@@ -93,6 +156,42 @@ public class ItemLimitListener implements Listener {
 
         Material material = moving.getType();
         if (!itemLimitManager.isItemLimited(material)) return;
+
+        // Special handling for offhand slot - items moving there should be allowed within limit
+        if (isOffhandSlot) {
+            int limit = itemLimitManager.getLimit(material);
+
+            // If banned, always cancel
+            if (limit == 0) {
+                event.setCancelled(true);
+                player.updateInventory();
+                sendBlockedMessage(player, material, limit);
+                return;
+            }
+
+            // Check if this is a swap (offhand already has an item of the same material)
+            ItemStack currentOffhand = player.getInventory().getItemInOffHand();
+            boolean isSwap = currentOffhand != null && currentOffhand.getType() == material;
+
+            if (isSwap) {
+                // If swapping same material, total count doesn't change, so allow it
+                return;
+            }
+
+            // For adding to offhand, check if it would exceed limit
+            int current = itemLimitManager.countItemInInventory(player, material);
+            int amountToAdd = moving.getAmount();
+
+            if (current + amountToAdd > limit) {
+                event.setCancelled(true);
+                player.updateInventory();
+                sendBlockedMessage(player, material, limit);
+                return;
+            }
+
+            // Allow the move if within limit
+            return;
+        }
 
         if (!isAddingToPlayer(action, clicked, playerInv)) return;
 
@@ -167,10 +266,10 @@ public class ItemLimitListener implements Listener {
         Inventory playerInv = player.getInventory();
         int current = itemLimitManager.countItemInInventory(player, material);
 
-        // Check if any dragged slot is in player inventory
+        // Check if any dragged slot is in player inventory (including offhand slot 40)
         boolean draggingToPlayerInv = false;
         for (int slot : event.getRawSlots()) {
-            if (slot < playerInv.getSize()) {
+            if (slot < playerInv.getSize() || slot == 40) {
                 draggingToPlayerInv = true;
                 break;
             }
